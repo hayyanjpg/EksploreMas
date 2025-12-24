@@ -1,0 +1,10 @@
+# File Sistem Komputer (Junk)
+.DS_Store
+Thumbs.db
+
+# Editor Settings (Jika kamu buka VS Code dari folder luar)
+.vscode/
+.idea/
+
+# Environment Variables (Jaga-jaga kalau ada di luar)
+.env
