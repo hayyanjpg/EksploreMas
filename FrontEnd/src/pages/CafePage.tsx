@@ -106,6 +106,10 @@ const mapCafe = (raw: ApiItem, idx: number): CafeUI => {
 };
 
 const CafePage: React.FC = () => {
+  // --- 1. SETUP API BASE URL ---
+  // Mengambil URL Ngrok dari environment variable, atau fallback ke localhost
+  const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
+
   const [search, setSearch] = useState("");
   const [activeFilters, setActiveFilters] = useState<Facility[]>([]);
 
@@ -158,9 +162,11 @@ const CafePage: React.FC = () => {
         setLoading(true);
         setError("");
 
+        // --- 2. UPDATE FETCH URL ---
+        // Menggunakan API_BASE dan endpoint backend yang benar (tanpa /api jika di backend tidak ada prefix /api)
         const [resNongkrong, resKuliner] = await Promise.all([
-          fetch("/api/tempat_nongkrong"),
-          fetch("/api/get_kuliner"),
+          fetch(`${API_BASE}/tempat_nongkrong`),
+          fetch(`${API_BASE}/get_kuliner`),
         ]);
 
         if (!resNongkrong.ok) throw new Error(`Gagal fetch tempat_nongkrong: ${resNongkrong.status}`);
@@ -287,7 +293,7 @@ const CafePage: React.FC = () => {
           <div className="mt-6 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
             {error}
             <div className="mt-1 text-xs text-red-600">
-              Cek: backend nyala, endpoint benar, dan proxy vite sudah jalan.
+              Cek: backend nyala, endpoint benar, dan variable VITE_API_BASE_URL sudah diset.
             </div>
           </div>
         )}
