@@ -26,17 +26,10 @@ const LoginPage: React.FC = () => {
     try {
       setIsLoading(true);
 
-      // 1. Kirim data ke Backend
-      // Backend kamu menggunakan endpoint /login dan meminta 'username' & 'password'
-      // Karena loginmu pakai email, kita perlu pastikan backend login pakai email atau username?
-      // Berdasarkan kode user.rs backend kamu: "SELECT * FROM users WHERE username = $1"
-      // ARTINYA: Backend login pakai USERNAME, bukan email.
-      // TAPI: Di form ini inputnya "Email". 
+      // --- PERBAIKAN: GUNAKAN ENV VITE_API_BASE_URL ---
+      const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
       
-      // SOLUSI: Sementara kita kirim 'email' ini sebagai 'username' ke backend
-      // (Asumsi user mendaftar pakai email sebagai username, atau backend perlu diubah nanti)
-      
-      const response = await fetch("http://localhost:3000/login", {
+      const response = await fetch(`${API_BASE}/login`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
