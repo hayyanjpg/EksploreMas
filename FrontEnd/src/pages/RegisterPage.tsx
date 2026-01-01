@@ -27,7 +27,10 @@ const RegisterPage: React.FC = () => {
     try {
       setIsLoading(true);
 
-      const response = await fetch("http://localhost:3000/register", {
+      // --- PERBAIKAN: GUNAKAN ENV VITE_API_BASE_URL ---
+      const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
+
+      const response = await fetch(`${API_BASE}/register`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
