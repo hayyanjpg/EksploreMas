@@ -1,38 +1,33 @@
 # --- TAHAP 1: BUILD (Memasak) ---
-# Gunakan image Rust terbaru
-FROM rust:latest as builder
+FROM rust:1.80-slim-bookworm as builder
 
-# Buat folder kerja di dalam Docker
 WORKDIR /app
 
-# Install library sistem yang sering dibutuhkan Rust (SSL & pkg-config)
+# Install library sistem
 RUN apt-get update && apt-get install -y pkg-config libssl-dev
 
-# Copy semua file kodingan kamu ke dalam Docker
+# Copy semua file
 COPY . .
 
-# PENTING: Matikan pengecekan koneksi database saat build
-# Ini mengatasi error "exit code 1" karena Docker tidak bisa akses Neon saat build
-ENV SQLX_OFFLINE=true
-
-# Build aplikasi ke mode release (siap pakai)
+# Build mode release
 RUN cargo build --release
 
 # --- TAHAP 2: RUN (Menyajikan) ---
-# Gunakan Linux ringan (Debian Slim) untuk menjalankan aplikasi
 FROM debian:bookworm-slim
 
 WORKDIR /app
 
-# Install sertifikat keamanan (WAJIB supaya bisa connect ke Database Neon/HTTPS)
+# Install SSL (PENTING untuk connect ke Neon)
 RUN apt-get update && apt-get install -y ca-certificates libssl-dev && rm -rf /var/lib/apt/lists/*
 
-# Copy file aplikasi yang sudah jadi (matang) dari Tahap 1
-# Pastikan nama 'capstone-be' sesuai dengan nama di Cargo.toml kamu
-COPY --from=builder /app/target/release/capstone-be /app/server
 
-# Buka port 3000 (sesuai settingan main.rs kamu)
-EXPOSE 3000
+COPY --from=builder /app/target/release/capstone-be ./server
 
-# Jalankan aplikasi
-CMD ["/app/server"]
+# Beri izin eksekusi
+RUN chmod +x ./server
+
+
+EXPOSE 7860
+
+# Jalankan server
+CMD ["./server"]
