@@ -93,6 +93,9 @@ const mapWisata = (raw: ApiItem, idx: number): Wisata => {
 };
 
 const WisataPage: React.FC = () => {
+  // --- 1. SETUP API BASE URL ---
+  const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
+
   const [search, setSearch] = useState("");
   const [activeTag, setActiveTag] = useState<WisataTag | null>(null);
 
@@ -119,9 +122,10 @@ const WisataPage: React.FC = () => {
         setLoading(true);
         setError("");
 
+        // --- 2. UPDATE FETCH URL ---
         const [resAlam, resPendidikan] = await Promise.all([
-          fetch("/api/wisata_alam"),
-          fetch("/api/wisata_pendidikan"),
+          fetch(`${API_BASE}/wisata_alam`),
+          fetch(`${API_BASE}/wisata_pendidikan`),
         ]);
 
         if (!resAlam.ok) throw new Error(`Gagal fetch wisata_alam: ${resAlam.status}`);
