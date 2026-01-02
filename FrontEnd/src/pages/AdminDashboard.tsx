@@ -1,6 +1,6 @@
+// src/pages/AdminDashboard.tsx
 import { useMemo, useState, FormEvent, useEffect } from "react";
 import { useNavigate } from "react-router-dom"; 
-// Import icon yang HANYA dipakai saja agar build Vercel aman
 import { 
   MapPin, Coffee, Mountain, PlusCircle, 
   Search, LogOut, Trash2, Pencil, FileText, Newspaper
@@ -15,7 +15,6 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
 const CAFE_TAGS = ["wifi", "socket", "ac", "24h", "parking", "studyFriendly"];
 const WISATA_TAGS = ["parking", "cheap", "instagrammable", "nature", "waterpark"];
 
-// Label biar lebih cantik di UI
 const TAG_LABELS: Record<string, string> = {
   wifi: "Wifi Gratis", socket: "Banyak Colokan", ac: "Ber-AC", "24h": "Buka 24 Jam",
   parking: "Area Parkir Luas", studyFriendly: "Nugas Friendly",
@@ -30,6 +29,10 @@ type AdminPlace = {
   address: string;
   imageUrl?: string;
   price?: number;
+  // Tambahan untuk Edit agar jam muncul
+  openTime?: string;
+  closeTime?: string;
+  tags?: string[];
 };
 
 type PlaceForm = {
@@ -38,7 +41,9 @@ type PlaceForm = {
   address: string;
   imageUrl: string;
   price: string;
-  tags: string[]; // State untuk menyimpan tags
+  openTime: string;  // Input Jam Buka
+  closeTime: string; // Input Jam Tutup
+  tags: string[]; 
 };
 
 type NewsItem = {
@@ -70,10 +75,7 @@ export default function AdminDashboard() {
     }
   }, [navigate]);
   
-  // TABS STATE
   const [activeTab, setActiveTab] = useState<"places" | "news">("places");
-
-  // DATA STATE
   const [places, setPlaces] = useState<AdminPlace[]>([]);
   const [newsList, setNewsList] = useState<NewsItem[]>([]);
   
@@ -81,17 +83,16 @@ export default function AdminDashboard() {
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
 
-  // PLACE FORM STATE
   const [searchQuery, setSearchQuery] = useState("");
   const [isEditing, setIsEditing] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
   
-  // Initial State
+  // Initial State dengan Jam
   const [placeForm, setPlaceForm] = useState<PlaceForm>({
-    name: "", category: "", address: "", imageUrl: "", price: "0", tags: []
+    name: "", category: "", address: "", imageUrl: "", price: "0", 
+    openTime: "", closeTime: "", tags: []
   });
 
-  // NEWS FORM STATE
   const [newsForm, setNewsForm] = useState<NewsForm>({
     title: "", category: "", date: "", image_url: "", content: ""
   });
@@ -99,7 +100,6 @@ export default function AdminDashboard() {
   // --- 1. FETCH ALL DATA ---
   const fetchData = async () => {
     try {
-      // Fetch Places
       const [resWisata, resPendidikan, resCafe, resKuliner] = await Promise.all([
         fetch(`${API_BASE}/wisata_alam`),
         fetch(`${API_BASE}/wisata_pendidikan`),
@@ -107,11 +107,23 @@ export default function AdminDashboard() {
         fetch(`${API_BASE}/get_kuliner`)
       ]);
       
-      const mergedPlaces = [
-        ...(resWisata.ok ? await resWisata.json() : []).map((i:any) => ({ id: i.id, name: i.nama_tempat, category: "Wisata Alam", address: i.alamat, imageUrl: i.link_foto, price: i.htm })),
-        ...(resPendidikan.ok ? await resPendidikan.json() : []).map((i:any) => ({ id: i.id, name: i.nama_tempat, category: "Wisata Pendidikan", address: i.alamat, imageUrl: i.link_foto, price: i.htm })),
-        ...(resCafe.ok ? await resCafe.json() : []).map((i:any) => ({ id: i.id, name: i.nama_tempat, category: "Cafe", address: i.alamat, imageUrl: i.link_foto, price: i.htm })),
-        ...(resKuliner.ok ? await resKuliner.json() : []).map((i:any) => ({ id: i.id, name: i.nama_tempat, category: "Kuliner", address: i.alamat, imageUrl: i.link_foto, price: i.htm })),
+      const mergedPlaces: AdminPlace[] = [
+        ...(resWisata.ok ? await resWisata.json() : []).map((i:any) => ({ 
+            id: i.id, name: i.nama_tempat, category: "Wisata Alam", address: i.alamat, imageUrl: i.link_foto, price: i.htm, 
+            openTime: i.jam_buka, closeTime: i.jam_tutup, tags: i.tags 
+        })),
+        ...(resPendidikan.ok ? await resPendidikan.json() : []).map((i:any) => ({ 
+            id: i.id, name: i.nama_tempat, category: "Wisata Pendidikan", address: i.alamat, imageUrl: i.link_foto, price: i.htm,
+            openTime: i.jam_buka, closeTime: i.jam_tutup, tags: i.tags
+        })),
+        ...(resCafe.ok ? await resCafe.json() : []).map((i:any) => ({ 
+            id: i.id, name: i.nama_tempat, category: "Cafe", address: i.alamat, imageUrl: i.link_foto, price: i.htm,
+            openTime: i.jam_buka, closeTime: i.jam_tutup, tags: i.tags
+        })),
+        ...(resKuliner.ok ? await resKuliner.json() : []).map((i:any) => ({ 
+            id: i.id, name: i.nama_tempat, category: "Kuliner", address: i.alamat, imageUrl: i.link_foto, price: i.htm,
+            openTime: i.jam_buka, closeTime: i.jam_tutup, tags: i.tags
+        })),
       ];
       setPlaces(mergedPlaces);
 
@@ -132,7 +144,6 @@ export default function AdminDashboard() {
     setPlaceForm((prev) => ({ ...prev, [field]: value }));
   };
 
-  // Handler Khusus Checkbox Tags
   const handleTagToggle = (tag: string) => {
     setPlaceForm(prev => {
       const currentTags = prev.tags || [];
@@ -154,6 +165,10 @@ export default function AdminDashboard() {
       let payload: any = {};
 
       const htmVal = parseInt(placeForm.price)||0;
+      
+      // Ambil jam dari form, default "-" jika kosong agar backend tidak error
+      const oTime = placeForm.openTime || "08:00";
+      const cTime = placeForm.closeTime || "22:00";
 
       // === LOGIC PENYIMPANAN DATA ===
       if (placeForm.category === "Wisata Alam") {
@@ -162,9 +177,9 @@ export default function AdminDashboard() {
           name: placeForm.name, 
           category: "wisata alam", 
           address: placeForm.address, 
-          open: "08:00", close: "17:00", htm: htmVal, 
+          open: oTime, close: cTime, htm: htmVal, 
           gmaps: "-", pictures: placeForm.imageUrl,
-          tags: placeForm.tags // <-- MENGIRIM TAGS
+          tags: placeForm.tags 
         };
       
       } else if (placeForm.category === "Wisata Pendidikan") {
@@ -173,9 +188,9 @@ export default function AdminDashboard() {
           name: placeForm.name, 
           category: "wisata pendidikan", 
           address: placeForm.address, 
-          open: "08:00", close: "16:00", htm: htmVal, 
+          open: oTime, close: cTime, htm: htmVal, 
           gmaps: "-", pictures: placeForm.imageUrl,
-          tags: placeForm.tags // <-- MENGIRIM TAGS
+          tags: placeForm.tags
         };
 
       } else if (placeForm.category === "Cafe") {
@@ -184,9 +199,9 @@ export default function AdminDashboard() {
           nama_tempat: placeForm.name, 
           kategori: "tempat nongkrong", 
           alamat: placeForm.address, 
-          jam_buka: "10:00", jam_tutup: "22:00", htm: htmVal, 
+          jam_buka: oTime, jam_tutup: cTime, htm: htmVal, 
           link_gmaps: "-", link_foto: placeForm.imageUrl, deskripsi: "-",
-          tags: placeForm.tags // <-- MENGIRIM TAGS
+          tags: placeForm.tags
         };
       
       } else if (placeForm.category === "Kuliner") {
@@ -197,7 +212,9 @@ export default function AdminDashboard() {
           alamat: placeForm.address, 
           htm: htmVal, 
           link_gmaps: "-", link_foto: placeForm.imageUrl, deskripsi: "-",
-          tags: placeForm.tags // <-- MENGIRIM TAGS
+          tags: placeForm.tags,
+          // Note: Backend kuliner.rs harus diupdate jika ingin menyimpan jam_buka/tutup ini
+          jam_buka: oTime, jam_tutup: cTime 
         };
       } else { 
         throw new Error("Kategori wajib dipilih"); 
@@ -208,15 +225,23 @@ export default function AdminDashboard() {
 
       setSuccessMsg(isEditing ? "Data berhasil diupdate!" : "Data berhasil ditambahkan!");
       setIsEditing(false); setEditId(null);
-      setPlaceForm({ name: "", category: "", address: "", imageUrl: "", price: "0", tags: [] });
+      setPlaceForm({ name: "", category: "", address: "", imageUrl: "", price: "0", openTime: "", closeTime: "", tags: [] });
       fetchData();
     } catch (err: any) { setError(err.message); } finally { setIsLoading(false); }
   };
 
   const handleEditPlace = (p: AdminPlace) => {
     setIsEditing(true); setEditId(p.id); setActiveTab("places");
-    // Reset tags dulu
-    setPlaceForm({ name: p.name, category: p.category, address: p.address, imageUrl: p.imageUrl||"", price: p.price?.toString()||"0", tags: [] });
+    setPlaceForm({ 
+        name: p.name, 
+        category: p.category, 
+        address: p.address, 
+        imageUrl: p.imageUrl||"", 
+        price: p.price?.toString()||"0",
+        openTime: p.openTime || "", 
+        closeTime: p.closeTime || "", 
+        tags: p.tags || []
+    });
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -281,11 +306,9 @@ export default function AdminDashboard() {
     }
   };
 
-  // Filter Logic
   const filteredPlaces = useMemo(() => places.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase())), [places, searchQuery]);
   const displayPlaces = searchQuery ? filteredPlaces : [...places].slice(-5).reverse();
 
-  // Helper untuk menentukan tags mana yang harus muncul
   const currentTagsList = useMemo(() => {
       const cat = placeForm.category;
       if (cat === "Cafe" || cat === "Kuliner") return CAFE_TAGS;
@@ -295,7 +318,6 @@ export default function AdminDashboard() {
 
   return (
     <div className="min-h-screen bg-pageRadial font-sans text-slate-800">
-      {/* HEADER */}
       <header className="bg-white/90 backdrop-blur border-b border-slate-200 sticky top-0 z-30">
         <div className="w-[min(1120px,92%)] mx-auto h-16 flex items-center justify-between px-4">
           <div>
@@ -309,8 +331,6 @@ export default function AdminDashboard() {
       </header>
 
       <main className="py-8 w-[min(1120px,92%)] mx-auto space-y-8 px-2">
-        
-        {/* STATS */}
         <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <InfoCard icon={<MapPin className="w-5 h-5"/>} title={`${places.length}`} text="Total Tempat" />
           <InfoCard icon={<Newspaper className="w-5 h-5"/>} title={`${newsList.length}`} text="Total Berita" />
@@ -318,30 +338,20 @@ export default function AdminDashboard() {
           <InfoCard icon={<Mountain className="w-5 h-5"/>} title={`${places.filter(p=>p.category.includes('Wisata')).length}`} text="Wisata" />
         </section>
 
-        {/* TABS SWITCHER */}
         <div className="flex gap-4 border-b border-slate-200">
-          <button 
-            onClick={() => setActiveTab("places")}
-            className={`pb-3 text-sm font-semibold flex items-center gap-2 border-b-2 transition ${activeTab==="places" ? "border-slate-900 text-slate-900" : "border-transparent text-slate-400 hover:text-slate-600"}`}
-          >
+          <button onClick={() => setActiveTab("places")} className={`pb-3 text-sm font-semibold flex items-center gap-2 border-b-2 transition ${activeTab==="places" ? "border-slate-900 text-slate-900" : "border-transparent text-slate-400 hover:text-slate-600"}`}>
             <MapPin className="w-4 h-4"/> Kelola Tempat
           </button>
-          <button 
-            onClick={() => setActiveTab("news")}
-            className={`pb-3 text-sm font-semibold flex items-center gap-2 border-b-2 transition ${activeTab==="news" ? "border-slate-900 text-slate-900" : "border-transparent text-slate-400 hover:text-slate-600"}`}
-          >
+          <button onClick={() => setActiveTab("news")} className={`pb-3 text-sm font-semibold flex items-center gap-2 border-b-2 transition ${activeTab==="news" ? "border-slate-900 text-slate-900" : "border-transparent text-slate-400 hover:text-slate-600"}`}>
             <Newspaper className="w-4 h-4"/> Kelola Berita
           </button>
         </div>
 
-        {/* NOTIFICATIONS */}
         {error && <div className="p-3 bg-red-50 text-red-600 text-xs rounded-lg border border-red-100">{error}</div>}
         {successMsg && <div className="p-3 bg-green-50 text-green-600 text-xs rounded-lg border border-green-100">{successMsg}</div>}
 
-        {/* === TAB CONTENT: PLACES === */}
         {activeTab === "places" && (
           <div className="grid lg:grid-cols-[1.5fr_1fr] gap-8 items-start">
-            {/* TABLE PLACES */}
             <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-5">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="font-bold text-slate-800">Daftar Tempat</h3>
@@ -371,21 +381,18 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {/* FORM PLACES */}
             <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 sticky top-24">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="font-bold text-slate-800 flex items-center gap-2">
                   {isEditing ? <Pencil className="w-4 h-4 text-blue-600"/> : <PlusCircle className="w-4 h-4 text-green-600"/>}
                   {isEditing ? "Edit Tempat" : "Tambah Tempat"}
                 </h3>
-                {isEditing && <button onClick={()=>{setIsEditing(false);setPlaceForm({name:"",category:"",address:"",imageUrl:"",price:"0",tags:[]})}} className="text-xs text-red-500">Batal</button>}
+                {isEditing && <button onClick={()=>{setIsEditing(false);setPlaceForm({name:"",category:"",address:"",imageUrl:"",price:"0",openTime:"",closeTime:"",tags:[]})}} className="text-xs text-red-500">Batal</button>}
               </div>
               
               <form onSubmit={handlePlaceSubmit} className="space-y-3">
-                {/* Field Nama */}
                 <div><label className="text-xs font-semibold">Nama</label><input className="w-full border rounded p-2 text-sm" value={placeForm.name} onChange={e=>handlePlaceChange("name",e.target.value)}/></div>
                 
-                {/* Field Kategori */}
                 <div><label className="text-xs font-semibold">Kategori</label>
                   <select className="w-full border rounded p-2 text-sm bg-white" value={placeForm.category} onChange={e=>handlePlaceChange("category",e.target.value)} disabled={isEditing}>
                     <option value="">Pilih...</option>
@@ -396,16 +403,17 @@ export default function AdminDashboard() {
                   </select>
                 </div>
 
-                {/* Field Alamat */}
                 <div><label className="text-xs font-semibold">Alamat</label><input className="w-full border rounded p-2 text-sm" value={placeForm.address} onChange={e=>handlePlaceChange("address",e.target.value)}/></div>
                 
-                {/* Field Link Foto */}
                 <div><label className="text-xs font-semibold">Link Foto</label><input className="w-full border rounded p-2 text-sm" placeholder="https://..." value={placeForm.imageUrl} onChange={e=>handlePlaceChange("imageUrl",e.target.value)}/></div>
                 
-                {/* Field Harga */}
+                <div className="grid grid-cols-2 gap-2">
+                    <div><label className="text-xs font-semibold">Jam Buka</label><input type="time" className="w-full border rounded p-2 text-sm" value={placeForm.openTime} onChange={e=>handlePlaceChange("openTime",e.target.value)}/></div>
+                    <div><label className="text-xs font-semibold">Jam Tutup</label><input type="time" className="w-full border rounded p-2 text-sm" value={placeForm.closeTime} onChange={e=>handlePlaceChange("closeTime",e.target.value)}/></div>
+                </div>
+
                 <div><label className="text-xs font-semibold">Harga / HTM</label><input type="number" className="w-full border rounded p-2 text-sm" value={placeForm.price} onChange={e=>handlePlaceChange("price",e.target.value)}/></div>
 
-                {/* === FACILITIES / TAGS CHECKBOXES (DISINI UI-NYA) === */}
                 {currentTagsList.length > 0 && (
                   <div className="pt-2 border-t border-dashed border-slate-200">
                     <label className="text-xs font-semibold block mb-2">Fasilitas & Fitur</label>
@@ -431,10 +439,8 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* === TAB CONTENT: NEWS === */}
         {activeTab === "news" && (
           <div className="grid lg:grid-cols-[1.5fr_1fr] gap-8 items-start">
-            {/* TABLE NEWS */}
             <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-5">
               <h3 className="font-bold text-slate-800 mb-4">Arsip Berita</h3>
               <div className="overflow-auto max-h-[500px]">
@@ -458,7 +464,6 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {/* FORM NEWS */}
             <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 sticky top-24">
               <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
                 <FileText className="w-4 h-4 text-indigo-600"/> Terbitkan Berita
