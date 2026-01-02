@@ -1,6 +1,6 @@
 import { useMemo, useState, FormEvent, useEffect } from "react";
 import { useNavigate } from "react-router-dom"; 
-// PERBAIKAN: Import hanya icon yang benar-benar dipakai agar Build Vercel Sukses
+// Import icon yang HANYA dipakai saja agar build Vercel aman
 import { 
   MapPin, Coffee, Mountain, PlusCircle, 
   Search, LogOut, Trash2, Pencil, FileText, Newspaper
@@ -164,7 +164,7 @@ export default function AdminDashboard() {
           address: placeForm.address, 
           open: "08:00", close: "17:00", htm: htmVal, 
           gmaps: "-", pictures: placeForm.imageUrl,
-          tags: placeForm.tags 
+          tags: placeForm.tags // <-- MENGIRIM TAGS
         };
       
       } else if (placeForm.category === "Wisata Pendidikan") {
@@ -175,7 +175,7 @@ export default function AdminDashboard() {
           address: placeForm.address, 
           open: "08:00", close: "16:00", htm: htmVal, 
           gmaps: "-", pictures: placeForm.imageUrl,
-          tags: placeForm.tags
+          tags: placeForm.tags // <-- MENGIRIM TAGS
         };
 
       } else if (placeForm.category === "Cafe") {
@@ -186,7 +186,7 @@ export default function AdminDashboard() {
           alamat: placeForm.address, 
           jam_buka: "10:00", jam_tutup: "22:00", htm: htmVal, 
           link_gmaps: "-", link_foto: placeForm.imageUrl, deskripsi: "-",
-          tags: placeForm.tags
+          tags: placeForm.tags // <-- MENGIRIM TAGS
         };
       
       } else if (placeForm.category === "Kuliner") {
@@ -197,7 +197,7 @@ export default function AdminDashboard() {
           alamat: placeForm.address, 
           htm: htmVal, 
           link_gmaps: "-", link_foto: placeForm.imageUrl, deskripsi: "-",
-          tags: placeForm.tags
+          tags: placeForm.tags // <-- MENGIRIM TAGS
         };
       } else { 
         throw new Error("Kategori wajib dipilih"); 
