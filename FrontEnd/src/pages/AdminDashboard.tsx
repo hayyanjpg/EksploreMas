@@ -1,3 +1,4 @@
+// src/pages/AdminDashboard.tsx
 import { useMemo, useState, FormEvent, useEffect } from "react";
 import { useNavigate } from "react-router-dom"; 
 import { 
@@ -47,6 +48,18 @@ type NewsForm = {
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
+
+  // === 🛡️ SECURITY CHECK (DITAMBAHKAN) ===
+  // Cek apakah user sudah login sebagai admin saat halaman dibuka
+  useEffect(() => {
+    const role = localStorage.getItem("role");
+    
+    // Jika tidak ada role 'admin', paksa kembali ke halaman login
+    if (role !== "admin") {
+      navigate("/loginadmin", { replace: true });
+    }
+  }, [navigate]);
+  // ===========================================
   
   // TABS STATE: 'places' atau 'news' (INI YANG MEMBUAT TAB BERFUNGSI)
   const [activeTab, setActiveTab] = useState<"places" | "news">("places");
@@ -196,7 +209,10 @@ export default function AdminDashboard() {
   };
 
   const handleLogout = () => {
-    if(confirm("Keluar admin?")) { localStorage.removeItem("role"); navigate("/"); }
+    if(confirm("Keluar admin?")) { 
+      localStorage.removeItem("role"); 
+      navigate("/loginadmin"); // Diupdate agar kembali ke halaman Login Admin
+    }
   };
 
   // Filter Logic
