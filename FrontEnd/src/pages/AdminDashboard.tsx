@@ -1,10 +1,9 @@
-// src/pages/AdminDashboard.tsx
-
 import { useMemo, useState, FormEvent, useEffect } from "react";
 import { useNavigate } from "react-router-dom"; 
+// PERBAIKAN: Import hanya icon yang benar-benar dipakai agar Build Vercel Sukses
 import { 
-  MapPin, Coffee, Mountain, Star, PlusCircle, Image as ImageIcon, 
-  Search, LogOut, Trash2, Pencil, XCircle, FileText, Newspaper, CheckSquare
+  MapPin, Coffee, Mountain, PlusCircle, 
+  Search, LogOut, Trash2, Pencil, FileText, Newspaper
 } from "lucide-react";
 
 import InfoCard from "../components/ui/InfoCard";
@@ -165,7 +164,7 @@ export default function AdminDashboard() {
           address: placeForm.address, 
           open: "08:00", close: "17:00", htm: htmVal, 
           gmaps: "-", pictures: placeForm.imageUrl,
-          tags: placeForm.tags // <-- MENGIRIM TAGS
+          tags: placeForm.tags 
         };
       
       } else if (placeForm.category === "Wisata Pendidikan") {
@@ -176,7 +175,7 @@ export default function AdminDashboard() {
           address: placeForm.address, 
           open: "08:00", close: "16:00", htm: htmVal, 
           gmaps: "-", pictures: placeForm.imageUrl,
-          tags: placeForm.tags // <-- MENGIRIM TAGS
+          tags: placeForm.tags
         };
 
       } else if (placeForm.category === "Cafe") {
@@ -187,7 +186,7 @@ export default function AdminDashboard() {
           alamat: placeForm.address, 
           jam_buka: "10:00", jam_tutup: "22:00", htm: htmVal, 
           link_gmaps: "-", link_foto: placeForm.imageUrl, deskripsi: "-",
-          tags: placeForm.tags // <-- MENGIRIM TAGS
+          tags: placeForm.tags
         };
       
       } else if (placeForm.category === "Kuliner") {
@@ -198,7 +197,7 @@ export default function AdminDashboard() {
           alamat: placeForm.address, 
           htm: htmVal, 
           link_gmaps: "-", link_foto: placeForm.imageUrl, deskripsi: "-",
-          tags: placeForm.tags // <-- MENGIRIM TAGS
+          tags: placeForm.tags
         };
       } else { 
         throw new Error("Kategori wajib dipilih"); 
@@ -216,6 +215,7 @@ export default function AdminDashboard() {
 
   const handleEditPlace = (p: AdminPlace) => {
     setIsEditing(true); setEditId(p.id); setActiveTab("places");
+    // Reset tags dulu
     setPlaceForm({ name: p.name, category: p.category, address: p.address, imageUrl: p.imageUrl||"", price: p.price?.toString()||"0", tags: [] });
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -324,7 +324,7 @@ export default function AdminDashboard() {
             onClick={() => setActiveTab("places")}
             className={`pb-3 text-sm font-semibold flex items-center gap-2 border-b-2 transition ${activeTab==="places" ? "border-slate-900 text-slate-900" : "border-transparent text-slate-400 hover:text-slate-600"}`}
           >
-            <MapPin className="w-4 h-4"/> Kelola Tempat baru test
+            <MapPin className="w-4 h-4"/> Kelola Tempat
           </button>
           <button 
             onClick={() => setActiveTab("news")}
