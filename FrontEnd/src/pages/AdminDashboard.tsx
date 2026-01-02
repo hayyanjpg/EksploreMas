@@ -62,7 +62,7 @@ type NewsForm = {
 export default function AdminDashboard() {
   const navigate = useNavigate();
 
-  // === 🛡️ SECURITY CHECK (Protected Route) ===
+  // === 🛡️ SECURITY CHECK ===
   useEffect(() => {
     const role = localStorage.getItem("role");
     if (role !== "admin") {
@@ -215,7 +215,6 @@ export default function AdminDashboard() {
 
   const handleEditPlace = (p: AdminPlace) => {
     setIsEditing(true); setEditId(p.id); setActiveTab("places");
-    // Reset tags dulu
     setPlaceForm({ name: p.name, category: p.category, address: p.address, imageUrl: p.imageUrl||"", price: p.price?.toString()||"0", tags: [] });
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
