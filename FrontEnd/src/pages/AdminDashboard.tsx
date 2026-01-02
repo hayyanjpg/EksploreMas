@@ -1,5 +1,5 @@
 // src/pages/AdminDashboard.tsx
-console.log("Admin Dashboard Loaded - Versi Baru");
+
 import { useMemo, useState, FormEvent, useEffect } from "react";
 import { useNavigate } from "react-router-dom"; 
 import { 
@@ -324,7 +324,7 @@ export default function AdminDashboard() {
             onClick={() => setActiveTab("places")}
             className={`pb-3 text-sm font-semibold flex items-center gap-2 border-b-2 transition ${activeTab==="places" ? "border-slate-900 text-slate-900" : "border-transparent text-slate-400 hover:text-slate-600"}`}
           >
-            <MapPin className="w-4 h-4"/> Kelola Tempat
+            <MapPin className="w-4 h-4"/> Kelola Tempat baru test
           </button>
           <button 
             onClick={() => setActiveTab("news")}
