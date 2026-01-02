@@ -62,7 +62,7 @@ type NewsForm = {
 export default function AdminDashboard() {
   const navigate = useNavigate();
 
-  // === 🛡️ SECURITY CHECK (Protected Route) ===
+  // === SECURITY CHECK ===
   useEffect(() => {
     const role = localStorage.getItem("role");
     if (role !== "admin") {
@@ -215,7 +215,7 @@ export default function AdminDashboard() {
 
   const handleEditPlace = (p: AdminPlace) => {
     setIsEditing(true); setEditId(p.id); setActiveTab("places");
-    // Reset tags dulu
+    // Reset tags dulu karena data dari list 'p' di atas belum tentu memuat tags lengkap (tergantung fetch)
     setPlaceForm({ name: p.name, category: p.category, address: p.address, imageUrl: p.imageUrl||"", price: p.price?.toString()||"0", tags: [] });
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -405,7 +405,7 @@ export default function AdminDashboard() {
                 {/* Field Harga */}
                 <div><label className="text-xs font-semibold">Harga / HTM</label><input type="number" className="w-full border rounded p-2 text-sm" value={placeForm.price} onChange={e=>handlePlaceChange("price",e.target.value)}/></div>
 
-                {/* === FACILITIES / TAGS CHECKBOXES (DISINI UI-NYA) === */}
+                {/* === FACILITIES / TAGS CHECKBOXES === */}
                 {currentTagsList.length > 0 && (
                   <div className="pt-2 border-t border-dashed border-slate-200">
                     <label className="text-xs font-semibold block mb-2">Fasilitas & Fitur</label>
@@ -419,7 +419,6 @@ export default function AdminDashboard() {
                         </div>
                       ))}
                     </div>
-                    <p className="text-[10px] text-slate-400 mt-1 italic">*Data tags akan dikirim ke backend</p>
                   </div>
                 )}
                 
