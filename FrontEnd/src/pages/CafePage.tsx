@@ -89,8 +89,9 @@ const mapCafe = (raw: ApiItem, idx: number): CafeUI => {
 
   const priceRange = formatRupiah(raw?.htm ?? raw?.harga ?? raw?.tiket);
 
-  // facilities: backend belum ada => kosong
-  const facilities: Facility[] = [];
+  // === PERBAIKAN PENTING DI SINI ===
+  // Ambil data 'tags' dari backend. Jika ada isinya, gunakan. Jika tidak, array kosong.
+  const facilities: Facility[] = Array.isArray(raw.tags) ? raw.tags : [];
 
   return {
     id,
@@ -100,14 +101,13 @@ const mapCafe = (raw: ApiItem, idx: number): CafeUI => {
     address,
     detailInfo,
     priceRange,
-    facilities,
+    facilities, // Data ini sekarang sudah dinamis dari backend
     kategori,
   };
 };
 
 const CafePage: React.FC = () => {
   // --- 1. SETUP API BASE URL ---
-  // Mengambil URL Ngrok dari environment variable, atau fallback ke localhost
   const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
 
   const [search, setSearch] = useState("");
@@ -162,8 +162,7 @@ const CafePage: React.FC = () => {
         setLoading(true);
         setError("");
 
-        // --- 2. UPDATE FETCH URL ---
-        // Menggunakan API_BASE dan endpoint backend yang benar (tanpa /api jika di backend tidak ada prefix /api)
+        // --- FETCH DATA DARI BACKEND ---
         const [resNongkrong, resKuliner] = await Promise.all([
           fetch(`${API_BASE}/tempat_nongkrong`),
           fetch(`${API_BASE}/get_kuliner`),
@@ -175,6 +174,7 @@ const CafePage: React.FC = () => {
         const dataNongkrong = normalizeToArray(await resNongkrong.json());
         const dataKuliner = normalizeToArray(await resKuliner.json());
 
+        // Mapping data backend ke UI
         const merged = [...dataNongkrong, ...dataKuliner].map(mapCafe);
 
         if (!alive) return;
@@ -194,11 +194,12 @@ const CafePage: React.FC = () => {
     };
   }, []);
 
-  // === MULTI FILTER fasilitas (UI asli) ===
+  // === MULTI FILTER fasilitas ===
   const toggleFilter = (f: Facility) => {
     setActiveFilters((prev) => (prev.includes(f) ? prev.filter((x) => x !== f) : [...prev, f]));
   };
 
+  // Cek apakah ada data cafe yang memiliki fasilitas (untuk validasi visual)
   const hasFacilitiesData = useMemo(() => cafes.some((c) => c.facilities && c.facilities.length > 0), [cafes]);
 
   const filteredCafes = useMemo(() => {
@@ -211,14 +212,14 @@ const CafePage: React.FC = () => {
       const kategoriLower = (cafe.kategori || "").toLowerCase();
       const matchKategori = !activeKategori || kategoriLower === activeKategori;
 
-      // fasilitas filter (hanya aktif kalau datanya ada)
+      // fasilitas filter (Logic: Jika tags cafe mengandung SEMUA filter yang aktif)
       const matchFilter =
         activeFilters.length === 0 ||
-        (hasFacilitiesData && activeFilters.every((f) => cafe.facilities.includes(f)));
+        (cafe.facilities && activeFilters.every((f) => cafe.facilities.includes(f)));
 
       return matchSearch && matchKategori && matchFilter;
     });
-  }, [cafes, search, activeKategori, activeFilters, hasFacilitiesData]);
+  }, [cafes, search, activeKategori, activeFilters]);
 
   return (
     <div className="flex justify-center px-4 py-10 md:py-16">
@@ -266,7 +267,7 @@ const CafePage: React.FC = () => {
           </button>
         </div>
 
-        {/* FILTER fasilitas (UI asli tetap tampil) */}
+        {/* FILTER FASILITAS (UI) */}
         <div className="mt-3 flex flex-wrap gap-2">
           {allFacilityFilters.map((f) => {
             const isActive = activeFilters.includes(f);
@@ -279,7 +280,7 @@ const CafePage: React.FC = () => {
                     ? "bg-[#001845] text-white border-[#001845]"
                     : "bg-white text-slate-700 border-slate-300 hover:border-[#001845]"
                 }`}
-                title={!hasFacilitiesData ? "Fasilitas belum tersedia di data backend" : ""}
+                title={!hasFacilitiesData ? "Belum ada data fasilitas dari backend" : ""}
               >
                 {facilityIcon[f]} {facilityLabel[f]}
               </button>
@@ -340,8 +341,9 @@ const CafePage: React.FC = () => {
                         {cafe.priceRange && <p>💸 {cafe.priceRange}</p>}
                       </div>
 
-                      {/* fasilitas bawah (kalau kosong, tetap tampil 1 ikon biar layout sama) */}
-                      <div className="mt-4 flex gap-2 border-t border-slate-200 pt-3 mt-auto">
+                      {/* ICON FASILITAS DI CARD */}
+                      <div className="mt-4 flex gap-2 border-t border-slate-200 pt-3 mt-auto flex-wrap">
+                        {/* Jika fasilitas kosong, tampilkan Wifi default atau kosong sama sekali (sesuaikan selera) */}
                         {(cafe.facilities.length > 0 ? cafe.facilities : ["wifi" as Facility]).map((f) => (
                           <div
                             key={f}
