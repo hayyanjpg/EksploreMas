@@ -3,7 +3,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { FaParking, FaMoneyBillAlt, FaCamera, FaLeaf, FaWater } from "react-icons/fa";
 
-// === TIPE DATA TAG (UI asli tetap) ===
+// === TIPE DATA TAG ===
 type WisataTag = "parking" | "cheap" | "instagrammable" | "nature" | "waterpark";
 
 // === TIPE DATA UI ===
@@ -21,7 +21,7 @@ interface Wisata {
 
 type ApiItem = Record<string, any>;
 
-// === LABEL & ICON TAG (UI asli tetap) ===
+// === LABEL & ICON TAG ===
 const tagConfig: Record<WisataTag, { label: string; icon: React.ReactNode }> = {
   parking: { label: "Parkir", icon: <FaParking /> },
   cheap: { label: "Murah", icon: <FaMoneyBillAlt /> },
@@ -60,15 +60,15 @@ const mapWisata = (raw: ApiItem, idx: number): Wisata => {
   const name = pickString(raw, ["nama_tempat", "name", "nama", "judul", "title"], `Wisata ${idx + 1}`);
   const id = String(raw.id ?? raw.uuid ?? raw.slug ?? raw.nama_tempat ?? slugify(name) ?? idx);
 
-  const kategori = pickString(raw, ["kategori"], "wisata alam");
-
+  // Normalisasi kategori agar filter bekerja (lowercase)
+  const rawKategori = pickString(raw, ["kategori"], "wisata alam").toLowerCase();
+  
   const jamBuka = pickString(raw, ["jam_buka", "openingHours", "opening_hours", "jam"], "");
   const jamTutup = pickString(raw, ["jam_tutup"], "");
   const openingHours = jamBuka && jamTutup ? `${jamBuka} – ${jamTutup}` : jamBuka || "";
 
-  // Backend kamu tidak punya deskripsi => fallback kategori biar tidak kosong
   const description =
-    pickString(raw, ["deskripsi", "description", "desc"], "") || `Kategori: ${kategori}`;
+    pickString(raw, ["deskripsi", "description", "desc"], "") || `Kategori: ${rawKategori}`;
 
   const imageUrl = pickString(raw, ["link_foto", "imageUrl", "image", "gambar", "foto"], "");
 
@@ -76,8 +76,8 @@ const mapWisata = (raw: ApiItem, idx: number): Wisata => {
 
   const priceRange = formatRupiah(raw?.htm ?? raw?.harga ?? raw?.tiket);
 
-  // tags: backend belum ada => kosongkan biar UI tetap aman
-  const tags: WisataTag[] = [];
+  // === PERBAIKAN DI SINI: Baca tags dari backend ===
+  const tags: WisataTag[] = Array.isArray(raw.tags) ? raw.tags : [];
 
   return {
     id,
@@ -88,25 +88,21 @@ const mapWisata = (raw: ApiItem, idx: number): Wisata => {
     openingHours,
     priceRange,
     tags,
-    kategori,
+    kategori: rawKategori, // Gunakan kategori yang sudah di-lowercase
   };
 };
 
 const WisataPage: React.FC = () => {
-  // --- 1. SETUP API BASE URL ---
   const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
 
   const [search, setSearch] = useState("");
   const [activeTag, setActiveTag] = useState<WisataTag | null>(null);
-
-  // FILTER KATEGORI YANG KAMU MAU: Alam vs Pendidikan
   const [activeKategori, setActiveKategori] = useState<"wisata alam" | "wisata pendidikan" | null>(null);
 
   const [wisataList, setWisataList] = useState<Wisata[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // fetch: gabung wisata_alam + wisata_pendidikan
   useEffect(() => {
     let alive = true;
 
@@ -122,7 +118,6 @@ const WisataPage: React.FC = () => {
         setLoading(true);
         setError("");
 
-        // --- 2. UPDATE FETCH URL ---
         const [resAlam, resPendidikan] = await Promise.all([
           fetch(`${API_BASE}/wisata_alam`),
           fetch(`${API_BASE}/wisata_pendidikan`),
@@ -153,7 +148,6 @@ const WisataPage: React.FC = () => {
     };
   }, []);
 
-  // ini tetap buat UI asli: kalau tags kosong, filter tag jangan bikin kosong
   const hasTagsData = useMemo(() => wisataList.some((w) => w.tags && w.tags.length > 0), [wisataList]);
 
   const filteredWisata = useMemo(() => {
@@ -162,23 +156,19 @@ const WisataPage: React.FC = () => {
         w.name.toLowerCase().includes(search.toLowerCase()) ||
         w.description.toLowerCase().includes(search.toLowerCase());
 
-      // TAG FILTER (hanya aktif jika datanya ada)
-      const matchTag = !activeTag || (hasTagsData && w.tags.includes(activeTag));
+      const matchTag = !activeTag || (w.tags && w.tags.includes(activeTag));
 
-      // KATEGORI FILTER (ALAM/PENDIDIKAN) -> ini yang utama & pasti jalan
       const kategoriLower = (w.kategori || "").toLowerCase();
-      const matchKategori =
-        !activeKategori || kategoriLower === activeKategori;
+      const matchKategori = !activeKategori || kategoriLower === activeKategori;
 
       return matchSearch && matchTag && matchKategori;
     });
-  }, [wisataList, search, activeTag, hasTagsData, activeKategori]);
+  }, [wisataList, search, activeTag, activeKategori]);
 
   return (
     <section id="wisata" className="bg-pageRadial">
       <div className="flex justify-center px-4 py-10 md:py-16">
         <div className="w-full max-w-6xl">
-          {/* HEADER */}
           <h1 className="font-playfair text-3xl md:text-4xl font-bold text-[#001845]">
             Nature &amp; Tourism
           </h1>
@@ -186,7 +176,6 @@ const WisataPage: React.FC = () => {
             Explore the natural beauty of Purwokerto
           </p>
 
-          {/* SEARCH BAR */}
           <div className="mt-6 w-full rounded-full border border-slate-300 bg-white px-6 py-3 flex items-center gap-3 shadow-sm">
             <span className="text-lg">🔍</span>
             <input
@@ -198,7 +187,6 @@ const WisataPage: React.FC = () => {
             />
           </div>
 
-          {/* FILTER KATEGORI (ALAM / PENDIDIKAN) */}
           <div className="mt-4 flex flex-wrap gap-2">
             <button
               onClick={() => setActiveKategori(activeKategori === "wisata alam" ? null : "wisata alam")}
@@ -227,7 +215,6 @@ const WisataPage: React.FC = () => {
             </button>
           </div>
 
-          {/* FILTER TAGS (UI asli tetap) */}
           <div className="mt-3 flex flex-wrap gap-2">
             {allTagFilters.map((tag) => (
               <button
@@ -238,7 +225,6 @@ const WisataPage: React.FC = () => {
                     ? "bg-[#001845] text-white border-[#001845]"
                     : "bg-white text-slate-700 border-slate-300 hover:border-[#001845]"
                 }`}
-                title={!hasTagsData ? "Tag belum tersedia di data backend" : ""}
               >
                 <span className="text-sm">{tagConfig[tag].icon}</span>
                 <span>{tagConfig[tag].label}</span>
@@ -246,18 +232,13 @@ const WisataPage: React.FC = () => {
             ))}
           </div>
 
-          {/* STATUS */}
-          {loading && <p className="mt-6 text-slate-600">Memuat data wisata dari database...</p>}
+          {loading && <p className="mt-6 text-slate-600">Memuat data wisata...</p>}
           {error && (
             <div className="mt-6 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
               {error}
-              <div className="mt-1 text-xs text-red-600">
-                Cek: backend nyala, endpoint benar, dan proxy vite sudah jalan.
-              </div>
             </div>
           )}
 
-          {/* LIST WISATA – SLIDER HORIZONTAL */}
           {!loading && !error && (
             <div className="mt-10 overflow-x-auto no-scrollbar">
               <div className="flex gap-6">
@@ -287,7 +268,7 @@ const WisataPage: React.FC = () => {
                       </h2>
 
                       <p className="mt-2 text-sm text-slate-600 line-clamp-3">
-                        {w.description || "Belum ada deskripsi."}
+                        {w.description}
                       </p>
 
                       <div className="mt-4 border-t border-slate-200 pt-3 space-y-2 text-xs md:text-sm text-slate-600">
@@ -296,7 +277,6 @@ const WisataPage: React.FC = () => {
                         {w.priceRange && <p>💸 {w.priceRange}</p>}
                       </div>
 
-                      {/* ICONS BAWAH CARD (UI asli, tapi aman kalau tags kosong) */}
                       <div className="mt-4 flex gap-2 border-t border-slate-200 pt-3">
                         {(w.tags.length > 0 ? w.tags : ["nature" as WisataTag]).map((tag) => (
                           <div
@@ -314,7 +294,7 @@ const WisataPage: React.FC = () => {
 
                 {filteredWisata.length === 0 && (
                   <p className="text-center text-slate-500 mt-6">
-                    Tempat wisata tidak ditemukan. Coba kata kunci atau filter lain.
+                    Tempat wisata tidak ditemukan.
                   </p>
                 )}
               </div>
