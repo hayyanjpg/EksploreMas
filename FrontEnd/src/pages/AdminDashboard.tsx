@@ -38,7 +38,7 @@ type PlaceForm = {
   address: string;
   imageUrl: string;
   price: string;
-  tags: string[]; // TAMBAHAN: State untuk menyimpan tags
+  tags: string[]; // State untuk menyimpan tags
 };
 
 type NewsItem = {
@@ -62,7 +62,7 @@ type NewsForm = {
 export default function AdminDashboard() {
   const navigate = useNavigate();
 
-  // SECURITY CHECK
+  // === SECURITY CHECK ===
   useEffect(() => {
     const role = localStorage.getItem("role");
     if (role !== "admin") {
@@ -86,7 +86,7 @@ export default function AdminDashboard() {
   const [isEditing, setIsEditing] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
   
-  // Update Initial State
+  // Initial State
   const [placeForm, setPlaceForm] = useState<PlaceForm>({
     name: "", category: "", address: "", imageUrl: "", price: "0", tags: []
   });
@@ -99,10 +99,10 @@ export default function AdminDashboard() {
   // --- 1. FETCH ALL DATA ---
   const fetchData = async () => {
     try {
-      // Fetch Places (Update: Tambah Wisata Pendidikan)
+      // Fetch Places
       const [resWisata, resPendidikan, resCafe, resKuliner] = await Promise.all([
         fetch(`${API_BASE}/wisata_alam`),
-        fetch(`${API_BASE}/wisata_pendidikan`), // Tambahan Fetch
+        fetch(`${API_BASE}/wisata_pendidikan`),
         fetch(`${API_BASE}/tempat_nongkrong`),
         fetch(`${API_BASE}/get_kuliner`)
       ]);
@@ -155,31 +155,53 @@ export default function AdminDashboard() {
 
       const htmVal = parseInt(placeForm.price)||0;
 
-      // Logic Endpoint yang lebih lengkap
+      // === LOGIC PENYIMPANAN DATA ===
       if (placeForm.category === "Wisata Alam") {
         endpoint = isEditing ? `${API_BASE}/api/update_wisata/${editId}` : `${API_BASE}/api/add_wisata`;
-        payload = { name: placeForm.name, category: "wisata alam", address: placeForm.address, open: "08:00", close: "17:00", htm: htmVal, gmaps: "-", pictures: placeForm.imageUrl };
+        payload = { 
+          name: placeForm.name, 
+          category: "wisata alam", 
+          address: placeForm.address, 
+          open: "08:00", close: "17:00", htm: htmVal, 
+          gmaps: "-", pictures: placeForm.imageUrl,
+          tags: placeForm.tags // <-- MENGIRIM TAGS
+        };
       
       } else if (placeForm.category === "Wisata Pendidikan") {
-        // Backend insert endpoint untuk pendidikan (sesuai main.rs kamu)
         endpoint = `${API_BASE}/add_wisata_pendidikan`; 
-        // Note: Update belum ada di main.rs kamu untuk pendidikan, jadi ini create only dulu atau pakai endpoint custom
-        payload = { name: placeForm.name, category: "wisata pendidikan", address: placeForm.address, open: "08:00", close: "16:00", htm: htmVal, gmaps: "-", pictures: placeForm.imageUrl };
+        payload = { 
+          name: placeForm.name, 
+          category: "wisata pendidikan", 
+          address: placeForm.address, 
+          open: "08:00", close: "16:00", htm: htmVal, 
+          gmaps: "-", pictures: placeForm.imageUrl,
+          tags: placeForm.tags // <-- MENGIRIM TAGS
+        };
 
       } else if (placeForm.category === "Cafe") {
         endpoint = isEditing ? `${API_BASE}/api/update_cafe/${editId}` : `${API_BASE}/api/add_tempat_nongkrong`;
-        payload = { nama_tempat: placeForm.name, kategori: "tempat nongkrong", alamat: placeForm.address, jam_buka: "10:00", jam_tutup: "22:00", htm: htmVal, link_gmaps: "-", link_foto: placeForm.imageUrl, deskripsi: "-" };
+        payload = { 
+          nama_tempat: placeForm.name, 
+          kategori: "tempat nongkrong", 
+          alamat: placeForm.address, 
+          jam_buka: "10:00", jam_tutup: "22:00", htm: htmVal, 
+          link_gmaps: "-", link_foto: placeForm.imageUrl, deskripsi: "-",
+          tags: placeForm.tags // <-- MENGIRIM TAGS
+        };
       
       } else if (placeForm.category === "Kuliner") {
         endpoint = isEditing ? `${API_BASE}/api/update_kuliner/${editId}` : `${API_BASE}/api/add_kuliner`;
-        payload = { nama_tempat: placeForm.name, kategori: "kuliner", alamat: placeForm.address, htm: htmVal, link_gmaps: "-", link_foto: placeForm.imageUrl, deskripsi: "-" };
+        payload = { 
+          nama_tempat: placeForm.name, 
+          kategori: "kuliner", 
+          alamat: placeForm.address, 
+          htm: htmVal, 
+          link_gmaps: "-", link_foto: placeForm.imageUrl, deskripsi: "-",
+          tags: placeForm.tags // <-- MENGIRIM TAGS
+        };
       } else { 
         throw new Error("Kategori wajib dipilih"); 
       }
-
-      console.log("Saving Data with Tags (Simulasi):", placeForm.tags);
-      // NOTE: Backend Rust saat ini belum menerima field 'tags'. 
-      // Payload di atas adalah struktur standar Backend yang kamu punya.
 
       const res = await fetch(endpoint, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       if (!res.ok) throw new Error("Gagal menyimpan tempat. Cek koneksi backend.");
@@ -193,7 +215,7 @@ export default function AdminDashboard() {
 
   const handleEditPlace = (p: AdminPlace) => {
     setIsEditing(true); setEditId(p.id); setActiveTab("places");
-    // Reset tags karena backend belum simpan tags (kosongkan dulu)
+    // Reset tags dulu karena data dari list 'p' di atas belum tentu memuat tags lengkap (tergantung fetch)
     setPlaceForm({ name: p.name, category: p.category, address: p.address, imageUrl: p.imageUrl||"", price: p.price?.toString()||"0", tags: [] });
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -201,7 +223,7 @@ export default function AdminDashboard() {
   const handleDeletePlace = async (id: number, cat: string) => {
     if(!confirm("Hapus tempat ini?")) return;
     let endpoint = "";
-    // Sesuaikan delete logic
+    
     if(cat==="Wisata Alam") endpoint=`${API_BASE}/api/delete_wisata/${id}`;
     else if(cat==="Wisata Pendidikan") { alert("Fitur hapus wisata pendidikan belum ada di backend"); return; }
     else if(cat==="Cafe") endpoint=`${API_BASE}/api/delete_cafe/${id}`;
@@ -363,7 +385,7 @@ export default function AdminDashboard() {
                 {/* Field Nama */}
                 <div><label className="text-xs font-semibold">Nama</label><input className="w-full border rounded p-2 text-sm" value={placeForm.name} onChange={e=>handlePlaceChange("name",e.target.value)}/></div>
                 
-                {/* Field Kategori (Updated with Wisata Pendidikan) */}
+                {/* Field Kategori */}
                 <div><label className="text-xs font-semibold">Kategori</label>
                   <select className="w-full border rounded p-2 text-sm bg-white" value={placeForm.category} onChange={e=>handlePlaceChange("category",e.target.value)} disabled={isEditing}>
                     <option value="">Pilih...</option>
@@ -383,7 +405,7 @@ export default function AdminDashboard() {
                 {/* Field Harga */}
                 <div><label className="text-xs font-semibold">Harga / HTM</label><input type="number" className="w-full border rounded p-2 text-sm" value={placeForm.price} onChange={e=>handlePlaceChange("price",e.target.value)}/></div>
 
-                {/* === NEW: FACILITIES / TAGS CHECKBOXES === */}
+                {/* === FACILITIES / TAGS CHECKBOXES === */}
                 {currentTagsList.length > 0 && (
                   <div className="pt-2 border-t border-dashed border-slate-200">
                     <label className="text-xs font-semibold block mb-2">Fasilitas & Fitur</label>
@@ -397,7 +419,6 @@ export default function AdminDashboard() {
                         </div>
                       ))}
                     </div>
-                    <p className="text-[10px] text-slate-400 mt-1 italic">*Tags hanya tersimpan di UI Admin (Backend perlu update)</p>
                   </div>
                 )}
                 
