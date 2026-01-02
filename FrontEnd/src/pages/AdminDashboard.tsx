@@ -15,6 +15,7 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
 const CAFE_TAGS = ["wifi", "socket", "ac", "24h", "parking", "studyFriendly"];
 const WISATA_TAGS = ["parking", "cheap", "instagrammable", "nature", "waterpark"];
 
+// Label biar lebih cantik di UI
 const TAG_LABELS: Record<string, string> = {
   wifi: "Wifi Gratis", socket: "Banyak Colokan", ac: "Ber-AC", "24h": "Buka 24 Jam",
   parking: "Area Parkir Luas", studyFriendly: "Nugas Friendly",
@@ -183,7 +184,7 @@ export default function AdminDashboard() {
         };
       
       } else if (placeForm.category === "Wisata Pendidikan") {
-        endpoint = `${API_BASE}/add_wisata_pendidikan`; 
+        endpoint = isEditing ? `${API_BASE}/api/update_wisata_pendidikan/${editId}` : `${API_BASE}/api/add_wisata_pendidikan`;
         payload = { 
           name: placeForm.name, 
           category: "wisata pendidikan", 
@@ -213,7 +214,6 @@ export default function AdminDashboard() {
           htm: htmVal, 
           link_gmaps: "-", link_foto: placeForm.imageUrl, deskripsi: "-",
           tags: placeForm.tags,
-          // Note: Backend kuliner.rs harus diupdate jika ingin menyimpan jam_buka/tutup ini
           jam_buka: oTime, jam_tutup: cTime 
         };
       } else { 
@@ -250,7 +250,7 @@ export default function AdminDashboard() {
     let endpoint = "";
     
     if(cat==="Wisata Alam") endpoint=`${API_BASE}/api/delete_wisata/${id}`;
-    else if(cat==="Wisata Pendidikan") { alert("Fitur hapus wisata pendidikan belum ada di backend"); return; }
+    else if(cat==="Wisata Pendidikan") endpoint=`${API_BASE}/api/delete_wisata_pendidikan/${id}`;
     else if(cat==="Cafe") endpoint=`${API_BASE}/api/delete_cafe/${id}`;
     else if(cat==="Kuliner") endpoint=`${API_BASE}/api/delete_kuliner/${id}`;
 
@@ -391,8 +391,10 @@ export default function AdminDashboard() {
               </div>
               
               <form onSubmit={handlePlaceSubmit} className="space-y-3">
+                {/* Field Nama */}
                 <div><label className="text-xs font-semibold">Nama</label><input className="w-full border rounded p-2 text-sm" value={placeForm.name} onChange={e=>handlePlaceChange("name",e.target.value)}/></div>
                 
+                {/* Field Kategori */}
                 <div><label className="text-xs font-semibold">Kategori</label>
                   <select className="w-full border rounded p-2 text-sm bg-white" value={placeForm.category} onChange={e=>handlePlaceChange("category",e.target.value)} disabled={isEditing}>
                     <option value="">Pilih...</option>
@@ -403,17 +405,22 @@ export default function AdminDashboard() {
                   </select>
                 </div>
 
+                {/* Field Alamat */}
                 <div><label className="text-xs font-semibold">Alamat</label><input className="w-full border rounded p-2 text-sm" value={placeForm.address} onChange={e=>handlePlaceChange("address",e.target.value)}/></div>
                 
+                {/* Field Link Foto */}
                 <div><label className="text-xs font-semibold">Link Foto</label><input className="w-full border rounded p-2 text-sm" placeholder="https://..." value={placeForm.imageUrl} onChange={e=>handlePlaceChange("imageUrl",e.target.value)}/></div>
                 
+                {/* INPUT JAM BARU */}
                 <div className="grid grid-cols-2 gap-2">
                     <div><label className="text-xs font-semibold">Jam Buka</label><input type="time" className="w-full border rounded p-2 text-sm" value={placeForm.openTime} onChange={e=>handlePlaceChange("openTime",e.target.value)}/></div>
                     <div><label className="text-xs font-semibold">Jam Tutup</label><input type="time" className="w-full border rounded p-2 text-sm" value={placeForm.closeTime} onChange={e=>handlePlaceChange("closeTime",e.target.value)}/></div>
                 </div>
 
+                {/* Field Harga */}
                 <div><label className="text-xs font-semibold">Harga / HTM</label><input type="number" className="w-full border rounded p-2 text-sm" value={placeForm.price} onChange={e=>handlePlaceChange("price",e.target.value)}/></div>
 
+                {/* Facilities Checklist */}
                 {currentTagsList.length > 0 && (
                   <div className="pt-2 border-t border-dashed border-slate-200">
                     <label className="text-xs font-semibold block mb-2">Fasilitas & Fitur</label>
@@ -439,6 +446,7 @@ export default function AdminDashboard() {
           </div>
         )}
 
+        {/* TAB CONTENT: NEWS */}
         {activeTab === "news" && (
           <div className="grid lg:grid-cols-[1.5fr_1fr] gap-8 items-start">
             <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-5">
