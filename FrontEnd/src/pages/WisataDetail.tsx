@@ -1,31 +1,32 @@
 // src/pages/WisataDetail.tsx
 import React, { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { FiArrowLeft, FiMapPin, FiClock, FiDollarSign } from "react-icons/fi";
 
 const WisataDetail: React.FC = () => {
   const navigate = useNavigate();
-  const { slug } = useParams(); // ID dari URL
+  const { slug } = useParams(); // Ini ID
+  const location = useLocation();
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
+
+  // Ambil kategori dari query string (misal: ?kategori=wisata alam)
+  const queryParams = new URLSearchParams(location.search);
+  const kategoriParam = queryParams.get("kategori")?.toLowerCase();
 
   useEffect(() => {
     const fetchDetail = async () => {
       try {
         setLoading(true);
-        // Ambil data dari kedua sumber
-        const [resAlam, resPend] = await Promise.all([
-          fetch(`${API_BASE}/wisata_alam`),
-          fetch(`${API_BASE}/wisata_pendidikan`)
-        ]);
-        const listAlam = await resAlam.json();
-        const listPend = await resPend.json();
+        // Tentukan endpoint berdasarkan kategori agar tidak tertukar
+        const endpoint = kategoriParam === "wisata pendidikan" ? "wisata_pendidikan" : "wisata_alam";
         
-        const combined = [...listAlam, ...listPend];
+        const response = await fetch(`${API_BASE}/${endpoint}`);
+        const list = await response.json();
         
-        // PERBAIKAN: Gunakan pembanding yang kuat untuk ID
-        const found = combined.find(item => String(item.id) === String(slug));
+        // Cari data yang ID-nya sama
+        const found = list.find((item: any) => String(item.id) === String(slug));
         setData(found);
       } catch (e) {
         console.error(e);
@@ -34,43 +35,28 @@ const WisataDetail: React.FC = () => {
       }
     };
     fetchDetail();
-  }, [slug, API_BASE]);
+  }, [slug, kategoriParam]);
 
-  if (loading) return <div className="p-20 text-center">Memuat informasi...</div>;
-  if (!data) return (
-    <div className="p-20 text-center">
-      <button onClick={() => navigate(-1)} className="mb-4 bg-slate-100 px-4 py-2 rounded-full"><FiArrowLeft/> Kembali</button>
-      <p className="text-red-500 font-bold">Data wisata tidak ditemukan di database.</p>
-    </div>
-  );
+  if (loading) return <div className="p-20 text-center">Memuat...</div>;
+  if (!data) return <div className="p-20 text-center"><button onClick={() => navigate(-1)}>Kembali</button><p>Data tidak ditemukan.</p></div>;
 
   return (
-    <main className="min-h-screen bg-slate-50 py-10 px-4">
-      <div className="max-w-4xl mx-auto">
-        <button onClick={() => navigate(-1)} className="mb-6 flex items-center gap-2 bg-white px-4 py-2 rounded-full shadow-sm"><FiArrowLeft/> Kembali</button>
-        <div className="bg-white rounded-[40px] shadow-xl overflow-hidden">
-          <img src={data.link_foto || data.pictures} className="w-full h-80 object-cover" alt={data.nama_tempat} />
+    <div className="max-w-4xl mx-auto p-6">
+       <button onClick={() => navigate(-1)} className="mb-4 flex items-center gap-2"><FiArrowLeft/> Kembali</button>
+       <div className="bg-white rounded-3xl shadow-xl overflow-hidden">
+          <img src={data.link_foto} className="w-full h-80 object-cover" />
           <div className="p-8">
-            <h1 className="text-3xl font-bold">{data.nama_tempat || data.name}</h1>
-            <span className="inline-block mt-2 px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-bold uppercase">{data.kategori}</span>
-            <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6 border-t pt-8">
-              <div className="flex gap-4 items-start">
-                <FiMapPin className="text-blue-500 mt-1" />
-                <div><h4 className="font-bold">Lokasi</h4><p className="text-slate-500 text-sm">{data.alamat}</p></div>
-              </div>
-              <div className="flex gap-4 items-start">
-                <FiClock className="text-green-500 mt-1" />
-                <div><h4 className="font-bold">Waktu</h4><p className="text-slate-500 text-sm">{data.jam_buka} - {data.jam_tutup}</p></div>
-              </div>
-              <div className="flex gap-4 items-start">
-                <FiDollarSign className="text-amber-500 mt-1" />
-                <div><h4 className="font-bold">Tiket</h4><p className="text-slate-500 text-sm">Rp {(data.htm || 0).toLocaleString('id-ID')}</p></div>
-              </div>
-            </div>
+             <h1 className="text-3xl font-bold">{data.nama_tempat}</h1>
+             <p className="text-blue-600 font-bold uppercase text-sm mt-2">{data.kategori}</p>
+             <div className="mt-6 space-y-4">
+                <p className="flex items-center gap-2"><FiMapPin/> {data.alamat}</p>
+                <p className="flex items-center gap-2"><FiClock/> {data.jam_buka} - {data.jam_tutup}</p>
+                <p className="flex items-center gap-2"><FiDollarSign/> Rp {(data.htm || 0).toLocaleString()}</p>
+             </div>
+             <p className="mt-6 text-slate-600 leading-relaxed">{data.deskripsi}</p>
           </div>
-        </div>
-      </div>
-    </main>
+       </div>
+    </div>
   );
 };
 
