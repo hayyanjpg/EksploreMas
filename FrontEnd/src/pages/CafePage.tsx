@@ -9,11 +9,13 @@ import { TbAirConditioning } from "react-icons/tb";
 import { MdAccessTimeFilled } from "react-icons/md";
 import { FaParking, FaBookOpen } from "react-icons/fa";
 
-type Facility = "wifi" | "socket" | "ac" | "24h" | "parking" | "studyFriendly";
+// Sesuaikan Facility dengan label yang ada di database dump kamu
+type Facility = string;
 
 type ApiItem = Record<string, any>;
 
 type CafeUI = {
+  uniqueId: string; // Menggunakan Prefix (KUL- atau CAFE-)
   id: string;
   name: string;
   description: string;
@@ -22,36 +24,42 @@ type CafeUI = {
   detailInfo: string;
   priceRange: string;
   facilities: Facility[];
-  kategori: "tempat nongkrong" | "kuliner" | string;
+  kategori: string;
 };
 
-// === LABEL & ICON ===
-const facilityLabel: Record<Facility, string> = {
-  wifi: "Wifi Gratis",
-  socket: "Colokan",
-  ac: "AC",
+// === LABEL & ICON SINKRON DENGAN DB ===
+const facilityLabel: Record<string, string> = {
+  "Wifi Gratis": "Wifi Gratis",
+  "wifi": "Wifi Gratis",
+  "Colokan": "Colokan",
+  "socket": "Colokan",
+  "AC": "AC",
+  "ac": "AC",
+  "24 Jam": "24 Jam",
   "24h": "24 Jam",
-  parking: "Parkir",
-  studyFriendly: "Nugas Friendly",
+  "Area Parkir Luas": "Parkir",
+  "parking": "Parkir",
+  "Nugas Friendly": "Nugas Friendly",
+  "studyFriendly": "Nugas Friendly",
 };
 
-const facilityIcon: Record<Facility, React.ReactNode> = {
-  wifi: <FiWifi />,
-  socket: <PiPlugBold />,
-  ac: <TbAirConditioning />,
+const facilityIcon: Record<string, React.ReactNode> = {
+  "Wifi Gratis": <FiWifi />,
+  "wifi": <FiWifi />,
+  "Colokan": <PiPlugBold />,
+  "socket": <PiPlugBold />,
+  "AC": <TbAirConditioning />,
+  "ac": <TbAirConditioning />,
+  "24 Jam": <MdAccessTimeFilled />,
   "24h": <MdAccessTimeFilled />,
-  parking: <FaParking />,
-  studyFriendly: <FaBookOpen />,
+  "Area Parkir Luas": <FaParking />,
+  "parking": <FaParking />,
+  "Nugas Friendly": <FaBookOpen />,
+  "studyFriendly": <FaBookOpen />,
 };
 
-const allFacilityFilters: Facility[] = ["wifi", "24h", "socket", "ac", "parking", "studyFriendly"];
-
-// buat slug dari nama cafe
-const slugify = (name: string) =>
-  name
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)/g, "");
+// List filter untuk UI
+const allFacilityFilters = ["Wifi Gratis", "24 Jam", "Colokan", "AC", "Area Parkir Luas", "Nugas Friendly"];
 
 const pickString = (obj: Record<string, any>, keys: string[], fallback = "") => {
   for (const k of keys) {
@@ -70,301 +78,179 @@ const formatRupiah = (value: any) => {
   return s;
 };
 
-const mapCafe = (raw: ApiItem, idx: number): CafeUI => {
-  const name = pickString(raw, ["nama_tempat", "name", "nama", "judul", "title"], `Cafe ${idx + 1}`);
-  const id = String(raw.id ?? raw.uuid ?? raw.slug ?? raw.nama_tempat ?? slugify(name) ?? idx);
-
-  const kategori = pickString(raw, ["kategori"], "tempat nongkrong");
-
-  const jamBuka = pickString(raw, ["jam_buka", "opening_hours", "openingHours", "jam"], "");
-  const jamTutup = pickString(raw, ["jam_tutup"], "");
-  const detailInfo = jamBuka && jamTutup ? `${jamBuka} – ${jamTutup}` : jamBuka || "";
-
-  const description =
-    pickString(raw, ["deskripsi", "description", "desc"], "") || `Kategori: ${kategori}`;
-
-  const imageUrl = pickString(raw, ["link_foto", "imageUrl", "image", "gambar", "foto"], "");
-
-  const address = pickString(raw, ["alamat", "address", "lokasi"], "");
-
-  const priceRange = formatRupiah(raw?.htm ?? raw?.harga ?? raw?.tiket);
-
-  // === PERBAIKAN PENTING DI SINI ===
-  // Ambil data 'tags' dari backend. Jika ada isinya, gunakan. Jika tidak, array kosong.
-  const facilities: Facility[] = Array.isArray(raw.tags) ? raw.tags : [];
-
-  return {
-    id,
-    name,
-    description,
-    imageUrl,
-    address,
-    detailInfo,
-    priceRange,
-    facilities, // Data ini sekarang sudah dinamis dari backend
-    kategori,
-  };
-};
-
 const CafePage: React.FC = () => {
-  // --- 1. SETUP API BASE URL ---
   const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
 
   const [search, setSearch] = useState("");
-  const [activeFilters, setActiveFilters] = useState<Facility[]>([]);
-
-  // FILTER KATEGORI: Nongkrong / Kuliner
-  const [activeKategori, setActiveKategori] = useState<"tempat nongkrong" | "kuliner" | null>(null);
+  const [activeFilters, setActiveFilters] = useState<string[]>([]);
+  const [activeKategori, setActiveKategori] = useState<string | null>(null);
 
   const [cafes, setCafes] = useState<CafeUI[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // === DRAG SCROLL STATE ===
   const scrollRef = useRef<HTMLDivElement | null>(null);
-  const isDraggingRef = useRef(false);
-  const startXRef = useRef(0);
-  const scrollLeftRef = useRef(0);
 
-  const handleMouseDown = (e: MouseEvent<HTMLDivElement>) => {
-    if (!scrollRef.current) return;
-    isDraggingRef.current = true;
-    scrollRef.current.classList.add("cursor-grabbing");
-    startXRef.current = e.clientX;
-    scrollLeftRef.current = scrollRef.current.scrollLeft;
-  };
-
-  const handleMouseMove = (e: MouseEvent<HTMLDivElement>) => {
-    if (!isDraggingRef.current || !scrollRef.current) return;
-    const dx = e.clientX - startXRef.current;
-    scrollRef.current.scrollLeft = scrollLeftRef.current - dx;
-  };
-
-  const handleMouseUpOrLeave = () => {
-    if (!scrollRef.current) return;
-    isDraggingRef.current = false;
-    scrollRef.current.classList.remove("cursor-grabbing");
-  };
-
-  // === FETCH (gabung tempat_nongkrong + kuliner) ===
+  // === FETCH & MAPPING ===
   useEffect(() => {
     let alive = true;
-
-    const normalizeToArray = (data: any): ApiItem[] => {
-      if (Array.isArray(data)) return data;
-      if (Array.isArray(data?.data)) return data.data;
-      if (data) return [data];
-      return [];
-    };
 
     const run = async () => {
       try {
         setLoading(true);
-        setError("");
-
-        // --- FETCH DATA DARI BACKEND ---
         const [resNongkrong, resKuliner] = await Promise.all([
           fetch(`${API_BASE}/tempat_nongkrong`),
           fetch(`${API_BASE}/get_kuliner`),
         ]);
 
-        if (!resNongkrong.ok) throw new Error(`Gagal fetch tempat_nongkrong: ${resNongkrong.status}`);
-        if (!resKuliner.ok) throw new Error(`Gagal fetch kuliner: ${resKuliner.status}`);
+        const dataNongkrong = await resNongkrong.json();
+        const dataKuliner = await resKuliner.json();
 
-        const dataNongkrong = normalizeToArray(await resNongkrong.json());
-        const dataKuliner = normalizeToArray(await resKuliner.json());
+        // MAPPING DENGAN PREFIX UNTUK MENCEGAH ID COLLISION
+        const mappedNongkrong = dataNongkrong.map((raw: any, idx: number) => ({
+          ...mapToUI(raw, idx, "CAFE"),
+          uniqueId: `CAFE-${raw.id}`,
+        }));
 
-        // Mapping data backend ke UI
-        const merged = [...dataNongkrong, ...dataKuliner].map(mapCafe);
+        const mappedKuliner = dataKuliner.map((raw: any, idx: number) => ({
+          ...mapToUI(raw, idx, "KUL"),
+          uniqueId: `KUL-${raw.id}`,
+        }));
 
         if (!alive) return;
-        setCafes(merged);
+        setCafes([...mappedNongkrong, ...mappedKuliner]);
       } catch (e: any) {
-        if (!alive) return;
-        setError(e?.message ?? "Terjadi error saat mengambil data cafe/kuliner.");
+        if (alive) setError("Gagal mengambil data dari database.");
       } finally {
-        if (!alive) return;
-        setLoading(false);
+        if (alive) setLoading(false);
       }
     };
 
     run();
-    return () => {
-      alive = false;
-    };
+    return () => { alive = false; };
   }, []);
 
-  // === MULTI FILTER fasilitas ===
-  const toggleFilter = (f: Facility) => {
-    setActiveFilters((prev) => (prev.includes(f) ? prev.filter((x) => x !== f) : [...prev, f]));
+  const mapToUI = (raw: any, idx: number, prefix: string): Omit<CafeUI, "uniqueId"> => {
+    const kategori = pickString(raw, ["kategori"], prefix === "CAFE" ? "tempat nongkrong" : "kuliner");
+    return {
+      id: String(raw.id),
+      name: pickString(raw, ["nama_tempat", "name"]),
+      description: raw.deskripsi && raw.deskripsi !== "-" ? raw.deskripsi : `Nikmati suasana terbaik di ${raw.nama_tempat}`,
+      imageUrl: raw.link_foto,
+      address: raw.alamat,
+      detailInfo: `${raw.jam_buka} - ${raw.jam_tutup}`,
+      priceRange: formatRupiah(raw.htm),
+      facilities: Array.isArray(raw.tags) ? raw.tags : [],
+      kategori: kategori.toLowerCase(),
+    };
   };
 
-  // Cek apakah ada data cafe yang memiliki fasilitas (untuk validasi visual)
-  const hasFacilitiesData = useMemo(() => cafes.some((c) => c.facilities && c.facilities.length > 0), [cafes]);
-
+  // === FILTER LOGIC ===
   const filteredCafes = useMemo(() => {
     return cafes.filter((cafe) => {
-      const matchSearch =
-        cafe.name.toLowerCase().includes(search.toLowerCase()) ||
-        cafe.description.toLowerCase().includes(search.toLowerCase());
-
-      // kategori filter (utama)
-      const kategoriLower = (cafe.kategori || "").toLowerCase();
-      const matchKategori = !activeKategori || kategoriLower === activeKategori;
-
-      // fasilitas filter (Logic: Jika tags cafe mengandung SEMUA filter yang aktif)
-      const matchFilter =
-        activeFilters.length === 0 ||
-        (cafe.facilities && activeFilters.every((f) => cafe.facilities.includes(f)));
+      const matchSearch = cafe.name.toLowerCase().includes(search.toLowerCase());
+      const matchKategori = !activeKategori || cafe.kategori === activeKategori.toLowerCase();
+      
+      // Multi Filter Fasilitas (Mendukung alias tag di database)
+      const matchFilter = activeFilters.length === 0 || activeFilters.every(filter => {
+        return cafe.facilities.some(tag => {
+            const normalizedTag = tag.toLowerCase();
+            const normalizedFilter = filter.toLowerCase();
+            // Cek kesamaan langsung atau via mapping label
+            return normalizedTag === normalizedFilter || 
+                   (normalizedFilter === "wifi gratis" && normalizedTag === "wifi") ||
+                   (normalizedFilter === "area parkir luas" && normalizedTag === "parking") ||
+                   (normalizedFilter === "24 jam" && normalizedTag === "24h");
+        });
+      });
 
       return matchSearch && matchKategori && matchFilter;
     });
   }, [cafes, search, activeKategori, activeFilters]);
 
+  const toggleFilter = (f: string) => {
+    setActiveFilters(prev => prev.includes(f) ? prev.filter(x => x !== f) : [...prev, f]);
+  };
+
   return (
-    <div className="flex justify-center px-4 py-10 md:py-16">
+    <div className="flex justify-center px-4 py-10 md:py-16 bg-slate-50 min-h-screen">
       <div className="w-full max-w-6xl">
-        {/* HEADER */}
-        <h1 className="font-playfair text-3xl md:text-4xl font-bold text-[#001845]">
-          Cafe Recommendation
-        </h1>
-        <p className="mt-2 text-slate-600">Discover the finest coffee spots in Purwokerto</p>
+        <h1 className="font-playfair text-3xl md:text-4xl font-bold text-[#001845]">Cafe & Culinary</h1>
+        <p className="mt-2 text-slate-600">Discover the best spots in Purwokerto</p>
 
         {/* SEARCH */}
-        <div className="mt-6 w-full rounded-full border border-slate-300 bg-white px-6 py-3 flex items-center gap-3 shadow-sm">
-          <span className="text-lg">🔍</span>
-          <input
-            type="text"
-            placeholder="Cari cafe favorit kamu..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="flex-1 bg-transparent outline-none text-sm md:text-base text-slate-700 placeholder:text-slate-400"
+        <div className="mt-6 w-full rounded-full border border-slate-200 bg-white px-6 py-3 flex items-center gap-3 shadow-sm">
+          <span>🔍</span>
+          <input 
+            className="flex-1 outline-none text-slate-700" 
+            placeholder="Cari nama tempat..." 
+            value={search} 
+            onChange={(e) => setSearch(e.target.value)} 
           />
         </div>
 
-        {/* FILTER KATEGORI (NONGKRONG / KULINER) */}
+        {/* KATEGORI */}
         <div className="mt-4 flex flex-wrap gap-2">
-          <button
-            onClick={() => setActiveKategori(activeKategori === "tempat nongkrong" ? null : "tempat nongkrong")}
-            className={`flex items-center gap-2 rounded-full px-4 py-2 text-xs md:text-sm border transition-colors ${
-              activeKategori === "tempat nongkrong"
-                ? "bg-[#001845] text-white border-[#001845]"
-                : "bg-white text-slate-700 border-slate-300 hover:border-[#001845]"
-            }`}
-          >
-            Tempat Nongkrong
-          </button>
-
-          <button
-            onClick={() => setActiveKategori(activeKategori === "kuliner" ? null : "kuliner")}
-            className={`flex items-center gap-2 rounded-full px-4 py-2 text-xs md:text-sm border transition-colors ${
-              activeKategori === "kuliner"
-                ? "bg-[#001845] text-white border-[#001845]"
-                : "bg-white text-slate-700 border-slate-300 hover:border-[#001845]"
-            }`}
-          >
-            Kuliner
-          </button>
+          {["Tempat Nongkrong", "Kuliner"].map(cat => (
+            <button
+              key={cat}
+              onClick={() => setActiveKategori(activeKategori === cat ? null : cat)}
+              className={`px-4 py-2 rounded-full border text-sm transition ${activeKategori === cat ? "bg-[#001845] text-white" : "bg-white text-slate-600"}`}
+            >
+              {cat}
+            </button>
+          ))}
         </div>
 
-        {/* FILTER FASILITAS (UI) */}
+        {/* FASILITAS */}
         <div className="mt-3 flex flex-wrap gap-2">
-          {allFacilityFilters.map((f) => {
-            const isActive = activeFilters.includes(f);
-            return (
-              <button
-                key={f}
-                onClick={() => toggleFilter(f)}
-                className={`flex items-center gap-2 rounded-full px-4 py-2 text-xs md:text-sm border transition-colors ${
-                  isActive
-                    ? "bg-[#001845] text-white border-[#001845]"
-                    : "bg-white text-slate-700 border-slate-300 hover:border-[#001845]"
-                }`}
-                title={!hasFacilitiesData ? "Belum ada data fasilitas dari backend" : ""}
-              >
-                {facilityIcon[f]} {facilityLabel[f]}
-              </button>
-            );
-          })}
+          {allFacilityFilters.map(f => (
+            <button
+              key={f}
+              onClick={() => toggleFilter(f)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-full border text-xs transition ${activeFilters.includes(f) ? "bg-[#001845] text-white" : "bg-white text-slate-600"}`}
+            >
+              {facilityIcon[f]} {f}
+            </button>
+          ))}
         </div>
 
-        {/* STATUS */}
-        {loading && <p className="mt-6 text-slate-600">Memuat data cafe/kuliner dari database...</p>}
-        {error && (
-          <div className="mt-6 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-            {error}
-            <div className="mt-1 text-xs text-red-600">
-              Cek: backend nyala, endpoint benar, dan variable VITE_API_BASE_URL sudah diset.
-            </div>
-          </div>
-        )}
+        {loading && <p className="mt-10 text-center text-slate-400 animate-pulse">Memuat data...</p>}
 
-        {/* LIST */}
-        {!loading && !error && (
-          <div
-            ref={scrollRef}
-            className="mt-10 grid grid-flow-col auto-cols-[minmax(260px,1fr)] gap-6 overflow-x-auto pb-6 pr-6 cursor-grab select-none hide-scrollbar"
-            onMouseDown={handleMouseDown}
-            onMouseMove={handleMouseMove}
-            onMouseUp={handleMouseUpOrLeave}
-            onMouseLeave={handleMouseUpOrLeave}
-          >
-            {filteredCafes.map((cafe) => {
-              const slug = slugify(cafe.name);
-
-              return (
-                <Link
-                  key={cafe.id}
-                  to={`/cafes/${slug}`}
-                  className="block rounded-[32px] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#001845]"
-                >
-                  <article className="bg-white rounded-[32px] shadow-[0_20px_60px_rgba(15,23,42,0.16)] overflow-hidden flex flex-col h-full">
-                    <img
-                      src={cafe.imageUrl || "https://placehold.co/800x600?text=Cafe"}
-                      className="w-full h-64 object-cover"
-                      alt={cafe.name}
-                      loading="lazy"
+        {/* LIST GRID (Perbaikan Layout Mobile agar tidak bertumpuk) */}
+        {!loading && (
+          <div className="mt-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+            {filteredCafes.map((cafe) => (
+              <Link key={cafe.uniqueId} to={`/cafes/${cafe.uniqueId}`} className="group">
+                <article className="bg-white rounded-[32px] shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden flex flex-col h-full border border-slate-100">
+                  <div className="h-60 overflow-hidden">
+                    <img 
+                        src={cafe.imageUrl || "https://placehold.co/800x600?text=Cafe"} 
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
+                        alt={cafe.name} 
                     />
-
-                    <div className="px-6 pt-5 pb-6 flex flex-1 flex-col">
-                      <h2 className="font-playfair text-lg md:text-xl font-semibold text-[#001845]">
-                        {cafe.name}
-                      </h2>
-
-                      <p className="mt-2 text-sm text-slate-600 line-clamp-3">
-                        {cafe.description || "Belum ada deskripsi."}
-                      </p>
-
-                      <div className="mt-4 border-t border-slate-200 pt-3 space-y-2 text-xs md:text-sm text-slate-600">
-                        <p>📍 {cafe.address}</p>
-                        {cafe.detailInfo && <p>🕒 {cafe.detailInfo}</p>}
-                        {cafe.priceRange && <p>💸 {cafe.priceRange}</p>}
-                      </div>
-
-                      {/* ICON FASILITAS DI CARD */}
-                      <div className="mt-4 flex gap-2 border-t border-slate-200 pt-3 mt-auto flex-wrap">
-                        {/* Jika fasilitas kosong, tampilkan Wifi default atau kosong sama sekali (sesuaikan selera) */}
-                        {(cafe.facilities.length > 0 ? cafe.facilities : ["wifi" as Facility]).map((f) => (
-                          <div
-                            key={f}
-                            className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center text-slate-700"
-                            title={facilityLabel[f]}
-                          >
-                            {facilityIcon[f]}
-                          </div>
-                        ))}
-                      </div>
+                  </div>
+                  <div className="p-6 flex flex-col flex-1">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-amber-600 mb-2">{cafe.kategori}</span>
+                    <h2 className="font-playfair text-xl font-bold text-[#001845]">{cafe.name}</h2>
+                    <p className="mt-2 text-sm text-slate-500 line-clamp-2">{cafe.description}</p>
+                    
+                    <div className="mt-4 pt-4 border-t border-slate-100 text-xs text-slate-400 space-y-1">
+                      <p>📍 {cafe.address}</p>
+                      <p>🕒 {cafe.detailInfo}</p>
                     </div>
-                  </article>
-                </Link>
-              );
-            })}
 
-            {filteredCafes.length === 0 && (
-              <p className="text-center text-slate-500 mt-6">
-                Cafe tidak ditemukan. Coba kata kunci atau filter lain.
-              </p>
-            )}
+                    <div className="mt-6 flex gap-2 flex-wrap">
+                      {cafe.facilities.map(f => facilityIcon[f] && (
+                        <div key={f} className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 border border-slate-100" title={facilityLabel[f] || f}>
+                          {facilityIcon[f]}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </article>
+              </Link>
+            ))}
           </div>
         )}
       </div>
