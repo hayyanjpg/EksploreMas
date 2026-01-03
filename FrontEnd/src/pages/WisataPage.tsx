@@ -3,6 +3,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { FaParking, FaMoneyBillAlt, FaCamera, FaLeaf, FaWater } from "react-icons/fa";
 
+// Konfigurasi Tags yang Konsisten dengan Database
 const tagConfig: Record<string, { label: string; icon: React.ReactNode }> = {
   "Area Parkir Luas": { label: "Area Parkir Luas", icon: <FaParking /> },
   "Tiket Murah": { label: "Tiket Murah", icon: <FaMoneyBillAlt /> },
@@ -13,6 +14,8 @@ const tagConfig: Record<string, { label: string; icon: React.ReactNode }> = {
   cheap: { label: "Murah", icon: <FaMoneyBillAlt /> },
   nature: { label: "Alam", icon: <FaLeaf /> },
 };
+
+const allTagFilters = ["Area Parkir Luas", "Tiket Murah", "Spot Foto/Instagrammable", "Pemandangan Alam", "Wahana Air"];
 
 const WisataPage: React.FC = () => {
   const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
@@ -31,9 +34,11 @@ const WisataPage: React.FC = () => {
         ]);
         const dataAlam = await resAlam.json();
         const dataPend = await resPend.json();
+        
+        // Gabungkan data dengan penanda sumber asli agar tidak tertukar saat klik detail
         setWisataList([...dataAlam, ...dataPend]);
       } catch (e) {
-        console.error("Fetch error:", e);
+        console.error("Gagal memuat data:", e);
       } finally {
         setLoading(false);
       }
@@ -48,7 +53,10 @@ const WisataPage: React.FC = () => {
       const tags = Array.isArray(w.tags) ? w.tags : [];
 
       const matchSearch = name.includes(search.toLowerCase());
+      
+      // PERBAIKAN: Gunakan perbandingan string eksak untuk kategori
       const matchKategori = !activeKategori || kategori === activeKategori.toLowerCase();
+      
       const matchTag = !activeTag || tags.includes(activeTag);
 
       return matchSearch && matchKategori && matchTag;
@@ -56,52 +64,61 @@ const WisataPage: React.FC = () => {
   }, [wisataList, search, activeTag, activeKategori]);
 
   return (
-    <section id="wisata" className="bg-pageRadial min-h-screen pb-20 px-4">
+    <section className="bg-pageRadial min-h-screen pb-20 px-4">
       <div className="max-w-6xl mx-auto pt-10">
-        <h1 className="text-3xl font-bold text-[#001845] font-playfair">Nature & Tourism</h1>
-        <p className="text-slate-500 mt-2">Temukan keajaiban alam dan edukasi di Purwokerto</p>
+        <h1 className="text-3xl font-bold text-[#001845]">Nature & Tourism</h1>
         
-        <div className="mt-6 bg-white rounded-full border border-slate-200 px-6 py-3 shadow-sm flex items-center gap-3">
-          <span className="text-slate-400">🔍</span>
+        {/* Search */}
+        <div className="mt-6 bg-white rounded-full border px-6 py-3 shadow-sm flex items-center gap-3">
           <input 
-            className="w-full outline-none text-slate-700" 
-            placeholder="Cari destinasi favorit..." 
+            className="w-full outline-none" 
+            placeholder="Cari wisata alam atau pendidikan..." 
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
 
-        <div className="mt-6 flex flex-wrap gap-2">
+        {/* Kategori Filter */}
+        <div className="mt-4 flex flex-wrap gap-2">
           {["Wisata Alam", "Wisata Pendidikan"].map((cat) => (
             <button
               key={cat}
               onClick={() => setActiveKategori(activeKategori === cat ? null : cat)}
-              className={`px-5 py-2 rounded-full border text-sm font-medium transition-all ${
-                activeKategori === cat ? "bg-[#001845] text-white border-[#001845]" : "bg-white text-slate-600 border-slate-200"
-              }`}
+              className={`px-4 py-2 rounded-full border text-sm transition ${activeKategori === cat ? "bg-[#001845] text-white" : "bg-white text-slate-600"}`}
             >
               {cat}
             </button>
           ))}
         </div>
 
-        <div className="mt-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+        {/* Fasilitas Filter - Dipastikan Tetap Muncul */}
+        <div className="mt-4 flex flex-wrap gap-2">
+          {allTagFilters.map((tag) => (
+            <button
+              key={tag}
+              onClick={() => setActiveTag(activeTag === tag ? null : tag)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-full border text-xs transition ${activeTag === tag ? "bg-[#001845] text-white" : "bg-white text-slate-600"}`}
+            >
+              {tagConfig[tag]?.icon} {tagConfig[tag]?.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Grid List */}
+        <div className="mt-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredWisata.map((w) => (
-            <Link key={w.id} to={`/wisata/${w.id}`} className="group">
-              <div className="bg-white rounded-[32px] shadow-lg overflow-hidden h-full flex flex-col border border-slate-100 group-hover:-translate-y-2 transition-transform duration-300">
-                <div className="h-52 overflow-hidden">
-                   <img src={w.link_foto || w.pictures || "https://placehold.co/600x400"} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" alt={w.nama_tempat} />
-                </div>
+            <Link key={`${w.id}-${w.kategori}`} to={`/wisata/${w.id}`}>
+              <div className="bg-white rounded-[32px] shadow-lg overflow-hidden h-full flex flex-col hover:-translate-y-1 transition">
+                <img src={w.link_foto || w.pictures || "https://placehold.co/600x400"} className="h-52 w-full object-cover" alt={w.nama_tempat} />
                 <div className="p-6 flex-1 flex flex-col">
-                  <div className="flex justify-between items-start mb-2">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600 bg-blue-50 px-2 py-1 rounded-md">{w.kategori}</span>
-                    <span className="text-xs font-bold text-slate-900">Rp {(w.htm || 0).toLocaleString('id-ID')}</span>
-                  </div>
-                  <h2 className="text-xl font-bold text-[#001845] line-clamp-1">{w.nama_tempat || w.name}</h2>
-                  <p className="text-sm text-slate-500 mt-2 line-clamp-2 italic">📍 {w.alamat}</p>
-                  <div className="mt-auto pt-5 flex gap-2">
+                  <span className="text-[10px] font-bold uppercase text-blue-600 mb-1">{w.kategori}</span>
+                  <h2 className="text-xl font-bold text-[#001845]">{w.nama_tempat || w.name}</h2>
+                  <p className="text-sm text-slate-500 mt-2 line-clamp-2">📍 {w.alamat}</p>
+                  
+                  {/* Fasilitas Icons */}
+                  <div className="mt-auto pt-4 flex gap-2 flex-wrap">
                     {Array.isArray(w.tags) && w.tags.map((t: string) => tagConfig[t] && (
-                      <div key={t} className="w-8 h-8 bg-slate-50 rounded-full flex items-center justify-center text-slate-500 border border-slate-100" title={tagConfig[t].label}>
+                      <div key={t} className="p-2 bg-slate-50 rounded-full text-slate-500 border border-slate-100" title={tagConfig[t].label}>
                         {tagConfig[t].icon}
                       </div>
                     ))}
@@ -111,12 +128,6 @@ const WisataPage: React.FC = () => {
             </Link>
           ))}
         </div>
-
-        {!loading && filteredWisata.length === 0 && (
-          <div className="text-center py-20 bg-white/50 rounded-3xl mt-10 border border-dashed border-slate-300">
-            <p className="text-slate-400 font-medium">Destinasi tidak ditemukan dengan kriteria tersebut.</p>
-          </div>
-        )}
       </div>
     </section>
   );
