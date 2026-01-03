@@ -1,171 +1,249 @@
 // src/pages/WisataPage.tsx
 import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { FaParking, FaMoneyBillAlt, FaCamera, FaLeaf, FaWater } from "react-icons/fa";
 
-// Interface untuk tipe data Wisata agar konsisten
-interface WisataUI {
-  uniqueId: string;
+// React Icons (Sesuaikan dengan kebutuhan Wisata)
+import { FaParking, FaLeaf, FaWater, FaCamera, FaWalking } from "react-icons/fa";
+import { MdFamilyRestroom } from "react-icons/md";
+
+type Facility = string;
+
+type WisataUI = {
+  uniqueId: string; // ALAM- atau EDU-
   id: string;
-  nama_tempat: string;
+  name: string;
+  description: string;
+  imageUrl: string;
+  address: string;
+  detailInfo: string;
+  priceRange: string;
+  facilities: Facility[];
   kategori: string;
-  alamat: string;
-  link_foto: string;
-  htm: number;
-  tags: string[];
-  jam_buka: string;
-  jam_tutup: string;
-}
-
-const tagConfig: Record<string, { label: string; icon: React.ReactNode }> = {
-  "Area Parkir Luas": { label: "Area Parkir Luas", icon: <FaParking /> },
-  "Tiket Murah": { label: "Tiket Murah", icon: <FaMoneyBillAlt /> },
-  "Spot Foto/Instagrammable": { label: "Spot Foto", icon: <FaCamera /> },
-  "Pemandangan Alam": { label: "Pemandangan Alam", icon: <FaLeaf /> },
-  "Wahana Air": { label: "Wahana Air", icon: <FaWater /> },
-  parking: { label: "Parkir", icon: <FaParking /> },
-  nature: { label: "Alam", icon: <FaLeaf /> },
 };
 
-const allTagFilters = ["Area Parkir Luas", "Tiket Murah", "Spot Foto/Instagrammable", "Pemandangan Alam", "Wahana Air"];
+// === LABEL & ICON SINKRON DENGAN DB ===
+const facilityLabel: Record<string, string> = {
+  "Area Parkir Luas": "Parkir",
+  "parking": "Parkir",
+  "Pemandangan Alam": "Alam",
+  "nature": "Alam",
+  "Wahana Air": "Air",
+  "water": "Air",
+  "Spot Foto/Instagrammable": "Spot Foto",
+  "instagrammable": "Spot Foto",
+  "Ramah Keluarga": "Keluarga",
+  "family": "Keluarga",
+  "Akses Mudah": "Akses Mudah",
+  "walking": "Akses Mudah",
+};
+
+const facilityIcon: Record<string, React.ReactNode> = {
+  "Area Parkir Luas": <FaParking />,
+  "parking": <FaParking />,
+  "Pemandangan Alam": <FaLeaf />,
+  "nature": <FaLeaf />,
+  "Wahana Air": <FaWater />,
+  "water": <FaWater />,
+  "Spot Foto/Instagrammable": <FaCamera />,
+  "instagrammable": <FaCamera />,
+  "Ramah Keluarga": <MdFamilyRestroom />,
+  "family": <MdFamilyRestroom />,
+  "Akses Mudah": <FaWalking />,
+  "walking": <FaWalking />,
+};
+
+// List filter untuk UI Wisata
+const allWisataFilters = ["Area Parkir Luas", "Pemandangan Alam", "Wahana Air", "Spot Foto/Instagrammable", "Ramah Keluarga"];
+
+const pickString = (obj: Record<string, any>, keys: string[], fallback = "") => {
+  for (const k of keys) {
+    const v = obj?.[k];
+    if (typeof v === "string" && v.trim()) return v.trim();
+  }
+  return fallback;
+};
+
+const formatRupiah = (value: any) => {
+  if (typeof value === "number") return `Rp ${value.toLocaleString("id-ID")}`;
+  const s = String(value ?? "").trim();
+  if (!s) return "";
+  const n = Number(s);
+  if (!Number.isNaN(n)) return `Rp ${n.toLocaleString("id-ID")}`;
+  return s;
+};
 
 const WisataPage: React.FC = () => {
   const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
+
   const [search, setSearch] = useState("");
-  const [activeTag, setActiveTag] = useState<string | null>(null);
+  const [activeFilters, setActiveFilters] = useState<string[]>([]);
   const [activeKategori, setActiveKategori] = useState<string | null>(null);
-  const [wisataList, setWisataList] = useState<WisataUI[]>([]);
+
+  const [wisatas, setWisatas] = useState<WisataUI[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    const fetchData = async () => {
+    let alive = true;
+    const run = async () => {
       try {
-        const [resAlam, resPend] = await Promise.all([
+        setLoading(true);
+        const [resAlam, resEdu] = await Promise.all([
           fetch(`${API_BASE}/wisata_alam`),
-          fetch(`${API_BASE}/wisata_pendidikan`)
+          fetch(`${API_BASE}/wisata_pendidikan`),
         ]);
-        const dataAlam = await resAlam.json();
-        const dataPend = await resPend.json();
-        
-        // Menambahkan Unique ID Prefix untuk mencegah ID tertukar di halaman detail
-        const mappedAlam = dataAlam.map((item: any) => ({ ...item, uniqueId: `ALAM-${item.id}` }));
-        const mappedPend = dataPend.map((item: any) => ({ ...item, uniqueId: `EDU-${item.id}` }));
 
-        setWisataList([...mappedAlam, ...mappedPend]);
-      } catch (e) {
-        console.error("Gagal mengambil data:", e);
+        const dataAlam = await resAlam.json();
+        const dataEdu = await resEdu.json();
+
+        const mappedAlam = dataAlam.map((raw: any, idx: number) => ({
+          ...mapToUI(raw, idx, "ALAM"),
+          uniqueId: `ALAM-${raw.id}`,
+        }));
+
+        const mappedEdu = dataEdu.map((raw: any, idx: number) => ({
+          ...mapToUI(raw, idx, "EDU"),
+          uniqueId: `EDU-${raw.id}`,
+        }));
+
+        if (!alive) return;
+        setWisatas([...mappedAlam, ...mappedEdu]);
+      } catch (e: any) {
+        if (alive) setError("Gagal mengambil data wisata.");
       } finally {
-        setLoading(false);
+        if (alive) setLoading(false);
       }
     };
-    fetchData();
-  }, [API_BASE]);
 
-  const filteredWisata = useMemo(() => {
-    return wisataList.filter((w) => {
-      const name = (w.nama_tempat || "").toLowerCase();
-      const kategori = (w.kategori || "").toLowerCase().trim();
-      const tags = Array.isArray(w.tags) ? w.tags : [];
+    run();
+    return () => { alive = false; };
+  }, []);
 
-      const matchSearch = name.includes(search.toLowerCase());
-      const matchKategori = !activeKategori || kategori === activeKategori.toLowerCase();
+  const mapToUI = (raw: any, idx: number, prefix: string): Omit<WisataUI, "uniqueId"> => {
+    const kategori = pickString(raw, ["kategori"], prefix === "ALAM" ? "wisata alam" : "wisata pendidikan");
+    return {
+      id: String(raw.id),
+      name: pickString(raw, ["nama_tempat", "name"]),
+      description: raw.deskripsi && raw.deskripsi !== "-" ? raw.deskripsi : `Jelajahi keindahan destinasi ${raw.nama_tempat}`,
+      imageUrl: raw.link_foto,
+      address: raw.alamat,
+      detailInfo: `${raw.jam_buka} - ${raw.jam_tutup}`,
+      priceRange: formatRupiah(raw.htm),
+      facilities: Array.isArray(raw.tags) ? raw.tags : [],
+      kategori: kategori.toLowerCase(),
+    };
+  };
+
+  const filteredWisatas = useMemo(() => {
+    return wisatas.filter((w) => {
+      const matchSearch = w.name.toLowerCase().includes(search.toLowerCase());
+      const matchKategori = !activeKategori || w.kategori === activeKategori.toLowerCase();
       
-      // Menggunakan tipe string eksplisit pada parameter 't' untuk menghindari error build
-      const matchTag = !activeTag || tags.some((t: string) => 
-        t === activeTag || 
-        (activeTag === "Area Parkir Luas" && t === "parking") ||
-        (activeTag === "Pemandangan Alam" && t === "nature")
-      );
+      const matchFilter = activeFilters.length === 0 || activeFilters.every(filter => {
+        return w.facilities.some(tag => {
+            const normalizedTag = tag.toLowerCase();
+            const normalizedFilter = filter.toLowerCase();
+            return normalizedTag === normalizedFilter || 
+                   (normalizedFilter === "area parkir luas" && normalizedTag === "parking") ||
+                   (normalizedFilter === "pemandangan alam" && normalizedTag === "nature") ||
+                   (normalizedFilter === "wahana air" && normalizedTag === "water") ||
+                   (normalizedFilter === "spot foto/instagrammable" && normalizedTag === "instagrammable");
+        });
+      });
 
-      return matchSearch && matchKategori && matchTag;
+      return matchSearch && matchKategori && matchFilter;
     });
-  }, [wisataList, search, activeTag, activeKategori]);
+  }, [wisatas, search, activeKategori, activeFilters]);
+
+  const toggleFilter = (f: string) => {
+    setActiveFilters(prev => prev.includes(f) ? prev.filter(x => x !== f) : [...prev, f]);
+  };
 
   return (
-    <section className="bg-pageRadial min-h-screen pb-20 px-4">
-      <div className="max-w-6xl mx-auto pt-10">
-        <h1 className="text-3xl font-bold text-[#001845] font-playfair">Nature & Tourism</h1>
-        
-        {/* Search Input */}
-        <div className="mt-6 bg-white rounded-full border border-slate-200 px-6 py-3 shadow-sm flex items-center gap-3">
+    <div className="flex justify-center px-4 py-10 md:py-16 bg-slate-50 min-h-screen">
+      <div className="w-full max-w-6xl">
+        <h1 className="font-playfair text-3xl md:text-4xl font-bold text-[#001845]">Nature & Tourism</h1>
+        <p className="mt-2 text-slate-600">Discover the breathtaking landscapes of Purwokerto</p>
+
+        {/* SEARCH */}
+        <div className="mt-6 w-full rounded-full border border-slate-200 bg-white px-6 py-3 flex items-center gap-3 shadow-sm">
+          <span>🔍</span>
           <input 
-            className="w-full outline-none text-slate-700" 
-            placeholder="Cari destinasi favorit..." 
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            className="flex-1 outline-none text-slate-700" 
+            placeholder="Cari tempat wisata..." 
+            value={search} 
+            onChange={(e) => setSearch(e.target.value)} 
           />
         </div>
 
-        {/* Filter Kategori */}
+        {/* KATEGORI */}
         <div className="mt-4 flex flex-wrap gap-2">
-          {["Wisata Alam", "Wisata Pendidikan"].map((cat) => (
+          {["Wisata Alam", "Wisata Pendidikan"].map(cat => (
             <button
               key={cat}
               onClick={() => setActiveKategori(activeKategori === cat ? null : cat)}
-              className={`px-5 py-2 rounded-full border text-sm font-medium transition-all ${
-                activeKategori === cat ? "bg-[#001845] text-white" : "bg-white text-slate-600"
-              }`}
+              className={`px-4 py-2 rounded-full border text-sm transition ${activeKategori === cat ? "bg-[#001845] text-white" : "bg-white text-slate-600"}`}
             >
               {cat}
             </button>
           ))}
         </div>
 
-        {/* Filter Fasilitas */}
+        {/* FASILITAS */}
         <div className="mt-3 flex flex-wrap gap-2">
-          {allTagFilters.map((tag) => (
+          {allWisataFilters.map(f => (
             <button
-              key={tag}
-              onClick={() => setActiveTag(activeTag === tag ? null : tag)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-full border text-xs transition ${
-                activeTag === tag ? "bg-[#001845] text-white" : "bg-white text-slate-600"
-              }`}
+              key={f}
+              onClick={() => toggleFilter(f)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-full border text-xs transition ${activeFilters.includes(f) ? "bg-[#001845] text-white" : "bg-white text-slate-600"}`}
             >
-              {tagConfig[tag]?.icon} {tagConfig[tag]?.label}
+              {facilityIcon[f]} {facilityLabel[f] || f}
             </button>
           ))}
         </div>
 
-        {/* Render Grid Card */}
-        <div className="mt-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-          {filteredWisata.map((w) => (
-            <Link key={w.uniqueId} to={`/wisata/${w.uniqueId}`}>
-              <div className="bg-white rounded-[32px] shadow-lg overflow-hidden h-full flex flex-col border border-slate-100 hover:-translate-y-2 transition-transform duration-300">
-                <div className="h-52 overflow-hidden">
-                   <img 
-                    src={w.link_foto !== "-" ? w.link_foto : "https://placehold.co/600x400"} 
-                    className="w-full h-full object-cover" 
-                    alt={w.nama_tempat} 
-                   />
-                </div>
-                <div className="p-6 flex-1 flex flex-col">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600 bg-blue-50 px-2 py-1 rounded-md mb-2 w-fit">
-                    {w.kategori}
-                  </span>
-                  <h2 className="text-xl font-bold text-[#001845]">{w.nama_tempat}</h2>
-                  <p className="text-sm text-slate-500 mt-2 line-clamp-2">📍 {w.alamat}</p>
-                  
-                  {/* Ikon Fasilitas pada Card */}
-                  <div className="mt-auto pt-5 flex gap-2 flex-wrap">
-                    {w.tags && w.tags.map((t: string) => tagConfig[t] && (
-                      <div 
-                        key={t} 
-                        className="w-8 h-8 bg-slate-50 rounded-full flex items-center justify-center text-slate-500 border border-slate-100" 
-                        title={tagConfig[t].label}
-                      >
-                        {tagConfig[t].icon}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </Link>
-          ))}
-        </div>
+        {loading && <p className="mt-10 text-center text-slate-400 animate-pulse">Memuat destinasi wisata...</p>}
+        {error && <p className="mt-10 text-center text-red-500">{error}</p>}
 
-        {loading && <p className="text-center mt-10 animate-pulse text-slate-400">Memuat data destinasi...</p>}
+        {/* LIST GRID */}
+        {!loading && (
+          <div className="mt-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+            {filteredWisatas.map((w) => (
+              <Link key={w.uniqueId} to={`/wisata/${w.uniqueId}`} className="group">
+                <article className="bg-white rounded-[32px] shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden flex flex-col h-full border border-slate-100">
+                  <div className="h-60 overflow-hidden">
+                    <img 
+                        src={w.imageUrl || "https://placehold.co/800x600?text=Wisata"} 
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
+                        alt={w.name} 
+                    />
+                  </div>
+                  <div className="p-6 flex flex-col flex-1">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-blue-600 mb-2">{w.kategori}</span>
+                    <h2 className="font-playfair text-xl font-bold text-[#001845]">{w.name}</h2>
+                    <p className="mt-2 text-sm text-slate-500 line-clamp-2">{w.description}</p>
+                    
+                    <div className="mt-4 pt-4 border-t border-slate-100 text-xs text-slate-400 space-y-1">
+                      <p>📍 {w.address}</p>
+                      <p>🕒 {w.detailInfo}</p>
+                      <p>💸 {w.priceRange}</p>
+                    </div>
+
+                    <div className="mt-6 flex gap-2 flex-wrap">
+                      {w.facilities.map(f => facilityIcon[f] && (
+                        <div key={f} className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 border border-slate-100" title={facilityLabel[f] || f}>
+                          {facilityIcon[f]}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </article>
+              </Link>
+            ))}
+          </div>
+        )}
       </div>
-    </section>
+    </div>
   );
 };
 
