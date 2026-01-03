@@ -3,20 +3,6 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { FaParking, FaMoneyBillAlt, FaCamera, FaLeaf, FaWater } from "react-icons/fa";
 
-type WisataTag = string;
-
-interface Wisata {
-  id: string;
-  name: string;
-  description: string;
-  imageUrl: string;
-  address: string;
-  openingHours: string;
-  priceRange: string;
-  tags: WisataTag[];
-  kategori: string;
-}
-
 const tagConfig: Record<string, { label: string; icon: React.ReactNode }> = {
   "Area Parkir Luas": { label: "Area Parkir Luas", icon: <FaParking /> },
   "Tiket Murah": { label: "Tiket Murah", icon: <FaMoneyBillAlt /> },
@@ -28,51 +14,26 @@ const tagConfig: Record<string, { label: string; icon: React.ReactNode }> = {
   nature: { label: "Alam", icon: <FaLeaf /> },
 };
 
-const allTagFilters = ["Area Parkir Luas", "Tiket Murah", "Spot Foto/Instagrammable", "Pemandangan Alam", "Wahana Air"];
-
 const WisataPage: React.FC = () => {
   const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
   const [search, setSearch] = useState("");
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [activeKategori, setActiveKategori] = useState<string | null>(null);
-  const [wisataList, setWisataList] = useState<Wisata[]>([]);
+  const [wisataList, setWisataList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-
-  const mapWisata = (raw: any, idx: number): Wisata => {
-    const name = raw.nama_tempat || raw.name || `Wisata ${idx + 1}`;
-    // Normalisasi Kategori untuk Filter agar konsisten (lowercase)
-    const kategori = String(raw.kategori || "").toLowerCase().trim();
-    const jamBuka = raw.jam_buka || "";
-    const jamTutup = raw.jam_tutup || "";
-    
-    return {
-      id: String(raw.id),
-      name,
-      description: raw.deskripsi || `Jelajahi keindahan ${name}`,
-      imageUrl: raw.link_foto || "https://placehold.co/800x600?text=Wisata",
-      address: raw.alamat || "Banyumas, Jawa Tengah",
-      openingHours: jamBuka && jamTutup ? `${jamBuka} - ${jamTutup}` : jamBuka || "08:00 - 17:00",
-      priceRange: typeof raw.htm === 'number' ? `Rp ${raw.htm.toLocaleString('id-ID')}` : (raw.htm || "Gratis"),
-      tags: Array.isArray(raw.tags) ? raw.tags : [],
-      kategori: kategori,
-    };
-  };
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        setLoading(true);
         const [resAlam, resPend] = await Promise.all([
           fetch(`${API_BASE}/wisata_alam`),
           fetch(`${API_BASE}/wisata_pendidikan`)
         ]);
         const dataAlam = await resAlam.json();
         const dataPend = await resPend.json();
-        const merged = [...dataAlam, ...dataPend].map((item, i) => mapWisata(item, i));
-        setWisataList(merged);
+        setWisataList([...dataAlam, ...dataPend]);
       } catch (e) {
-        setError("Gagal memuat data destinasi.");
+        console.error("Fetch error:", e);
       } finally {
         setLoading(false);
       }
@@ -82,81 +43,79 @@ const WisataPage: React.FC = () => {
 
   const filteredWisata = useMemo(() => {
     return wisataList.filter((w) => {
-      const matchSearch = w.name.toLowerCase().includes(search.toLowerCase());
-      const matchTag = !activeTag || w.tags.includes(activeTag);
-      // Pengecekan Kategori yang lebih fleksibel
-      const matchKategori = !activeKategori || w.kategori.includes(activeKategori);
-      return matchSearch && matchTag && matchKategori;
+      const name = (w.nama_tempat || w.name || "").toLowerCase();
+      const kategori = (w.kategori || "").toLowerCase().trim();
+      const tags = Array.isArray(w.tags) ? w.tags : [];
+
+      const matchSearch = name.includes(search.toLowerCase());
+      const matchKategori = !activeKategori || kategori === activeKategori.toLowerCase();
+      const matchTag = !activeTag || tags.includes(activeTag);
+
+      return matchSearch && matchKategori && matchTag;
     });
   }, [wisataList, search, activeTag, activeKategori]);
 
   return (
-    <section className="bg-pageRadial min-h-screen pb-20">
-      <div className="max-w-6xl mx-auto px-4 pt-10">
-        <h1 className="text-3xl font-bold text-[#001845]">Nature & Tourism</h1>
+    <section id="wisata" className="bg-pageRadial min-h-screen pb-20 px-4">
+      <div className="max-w-6xl mx-auto pt-10">
+        <h1 className="text-3xl font-bold text-[#001845] font-playfair">Nature & Tourism</h1>
+        <p className="text-slate-500 mt-2">Temukan keajaiban alam dan edukasi di Purwokerto</p>
         
-        {/* Search Bar */}
-        <div className="mt-6 bg-white rounded-full border px-6 py-3 shadow-sm flex items-center gap-3">
-          <span>🔍</span>
+        <div className="mt-6 bg-white rounded-full border border-slate-200 px-6 py-3 shadow-sm flex items-center gap-3">
+          <span className="text-slate-400">🔍</span>
           <input 
-            className="w-full outline-none bg-transparent" 
-            placeholder="Cari destinasi..." 
+            className="w-full outline-none text-slate-700" 
+            placeholder="Cari destinasi favorit..." 
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
 
-        {/* Kategori Filter */}
-        <div className="mt-4 flex flex-wrap gap-2">
+        <div className="mt-6 flex flex-wrap gap-2">
           {["Wisata Alam", "Wisata Pendidikan"].map((cat) => (
             <button
               key={cat}
-              onClick={() => setActiveKategori(activeKategori === cat.toLowerCase() ? null : cat.toLowerCase())}
-              className={`px-4 py-2 rounded-full border text-sm transition ${activeKategori === cat.toLowerCase() ? "bg-[#001845] text-white" : "bg-white"}`}
+              onClick={() => setActiveKategori(activeKategori === cat ? null : cat)}
+              className={`px-5 py-2 rounded-full border text-sm font-medium transition-all ${
+                activeKategori === cat ? "bg-[#001845] text-white border-[#001845]" : "bg-white text-slate-600 border-slate-200"
+              }`}
             >
               {cat}
             </button>
           ))}
         </div>
 
-        {/* Tag Filter */}
-        <div className="mt-3 flex flex-wrap gap-2">
-          {allTagFilters.map((tag) => (
-            <button
-              key={tag}
-              onClick={() => setActiveTag(activeTag === tag ? null : tag)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-full border text-xs transition ${activeTag === tag ? "bg-[#001845] text-white" : "bg-white"}`}
-            >
-              {tagConfig[tag]?.icon} {tagConfig[tag]?.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Grid List - Perbaikan agar Responsif Mobile */}
         <div className="mt-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
           {filteredWisata.map((w) => (
-            <Link key={w.id} to={`/wisata/${w.id}`}>
-              <article className="bg-white rounded-[32px] shadow-lg overflow-hidden hover:-translate-y-2 transition duration-300">
-                <img src={w.imageUrl} className="w-full h-52 object-cover" alt={w.name} />
-                <div className="p-6">
-                  <h2 className="text-xl font-bold text-[#001845]">{w.name}</h2>
-                  <div className="mt-3 text-sm text-slate-500 space-y-1">
-                    <p>📍 {w.address.substring(0, 40)}...</p>
-                    <p>💸 {w.priceRange}</p>
+            <Link key={w.id} to={`/wisata/${w.id}`} className="group">
+              <div className="bg-white rounded-[32px] shadow-lg overflow-hidden h-full flex flex-col border border-slate-100 group-hover:-translate-y-2 transition-transform duration-300">
+                <div className="h-52 overflow-hidden">
+                   <img src={w.link_foto || w.pictures || "https://placehold.co/600x400"} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" alt={w.nama_tempat} />
+                </div>
+                <div className="p-6 flex-1 flex flex-col">
+                  <div className="flex justify-between items-start mb-2">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600 bg-blue-50 px-2 py-1 rounded-md">{w.kategori}</span>
+                    <span className="text-xs font-bold text-slate-900">Rp {(w.htm || 0).toLocaleString('id-ID')}</span>
                   </div>
-                  <div className="mt-4 flex gap-2 flex-wrap">
-                    {w.tags.map(t => tagConfig[t] && (
-                      <span key={t} className="p-2 bg-slate-100 rounded-full text-slate-600">{tagConfig[t].icon}</span>
+                  <h2 className="text-xl font-bold text-[#001845] line-clamp-1">{w.nama_tempat || w.name}</h2>
+                  <p className="text-sm text-slate-500 mt-2 line-clamp-2 italic">📍 {w.alamat}</p>
+                  <div className="mt-auto pt-5 flex gap-2">
+                    {Array.isArray(w.tags) && w.tags.map((t: string) => tagConfig[t] && (
+                      <div key={t} className="w-8 h-8 bg-slate-50 rounded-full flex items-center justify-center text-slate-500 border border-slate-100" title={tagConfig[t].label}>
+                        {tagConfig[t].icon}
+                      </div>
                     ))}
                   </div>
                 </div>
-              </article>
+              </div>
             </Link>
           ))}
         </div>
-        
+
         {!loading && filteredWisata.length === 0 && (
-          <p className="text-center mt-10 text-slate-400 italic">Destinasi tidak ditemukan...</p>
+          <div className="text-center py-20 bg-white/50 rounded-3xl mt-10 border border-dashed border-slate-300">
+            <p className="text-slate-400 font-medium">Destinasi tidak ditemukan dengan kriteria tersebut.</p>
+          </div>
         )}
       </div>
     </section>
