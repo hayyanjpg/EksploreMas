@@ -1,7 +1,7 @@
 // src/components/trip/CategorySelector.tsx
 import React from "react";
 import { TripCategory } from "../../types/trip";
-import { FiCheck, FiChevronRight } from "react-icons/fi";
+import { FiCheck } from "react-icons/fi";
 import { FaMountain, FaGraduationCap, FaUtensils, FaCoffee } from "react-icons/fa";
 
 const CATEGORY_CONFIG: Record<
@@ -33,13 +33,12 @@ const CATEGORY_CONFIG: Record<
 interface CategorySelectorProps {
   selectedCategories: TripCategory[];
   onToggleCategory: (cat: TripCategory) => void;
-  onNext: () => void;
+  // onNext dihapus karena tombol navigasi sekarang diatur oleh TripPlanner.tsx
 }
 
 const CategorySelector: React.FC<CategorySelectorProps> = ({
   selectedCategories,
   onToggleCategory,
-  onNext,
 }) => {
   const selectedCount = selectedCategories.length;
 
@@ -115,24 +114,12 @@ const CategorySelector: React.FC<CategorySelectorProps> = ({
         })}
       </div>
 
-      <div className="mt-6 flex flex-col md:flex-row items-center justify-between gap-3">
-        <p className="text-xs md:text-sm text-slate-500">
+      {/* Footer hanya berisi Tips, Tombol Lanjut sudah dihapus dari sini */}
+      <div className="mt-6">
+        <p className="text-xs md:text-sm text-slate-500 text-center md:text-left">
           Tips: kamu bisa pilih lebih dari satu kategori, misalnya{" "}
           <span className="font-semibold">Alam + Kuliner</span>.
         </p>
-        <button
-          type="button"
-          onClick={onNext}
-          disabled={selectedCategories.length === 0}
-          className={`inline-flex items-center gap-2 rounded-full px-6 py-2.5 text-sm font-medium transition ${
-            selectedCategories.length === 0
-              ? "bg-slate-200 text-slate-500 cursor-not-allowed"
-              : "bg-[#001845] text-white hover:bg-[#001132]"
-          }`}
-        >
-          Lanjut Pilih Durasi
-          <FiChevronRight />
-        </button>
       </div>
     </div>
   );
