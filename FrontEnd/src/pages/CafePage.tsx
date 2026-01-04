@@ -1,5 +1,5 @@
 // src/pages/CafePage.tsx
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
 // React Icons
@@ -7,11 +7,9 @@ import { FiWifi } from "react-icons/fi";
 import { PiPlugBold } from "react-icons/pi";
 import { TbAirConditioning } from "react-icons/tb";
 import { MdAccessTimeFilled } from "react-icons/md";
-import { FaParking, FaBookOpen, FaChevronDown } from "react-icons/fa";
+import { FaParking, FaBookOpen } from "react-icons/fa";
 
 type Facility = string;
-type ApiItem = Record<string, any>;
-
 type CafeUI = {
   uniqueId: string;
   id: string;
@@ -25,7 +23,7 @@ type CafeUI = {
   kategori: string;
 };
 
-// === LABEL & ICON SINKRON DENGAN DB ===
+// === CONFIG ===
 const facilityLabel: Record<string, string> = {
   "Wifi Gratis": "Wifi Gratis", "wifi": "Wifi Gratis",
   "Colokan": "Colokan", "socket": "Colokan",
@@ -46,6 +44,7 @@ const facilityIcon: Record<string, React.ReactNode> = {
 
 const allFacilityFilters = ["Wifi Gratis", "24 Jam", "Colokan", "AC", "Area Parkir Luas", "Nugas Friendly"];
 
+// Helper Functions
 const pickString = (obj: Record<string, any>, keys: string[], fallback = "") => {
   for (const k of keys) {
     const v = obj?.[k];
@@ -70,13 +69,13 @@ const CafePage: React.FC = () => {
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
   const [activeKategori, setActiveKategori] = useState<string | null>(null);
 
-  // STATE BARU: Limit item yang ditampilkan
-  const [visibleLimit, setVisibleLimit] = useState<number>(10);
+  // SET LIMIT AWAL JADI 9
+  const [visibleLimit, setVisibleLimit] = useState<number>(9);
 
   const [cafes, setCafes] = useState<CafeUI[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
 
+  // FETCH DATA
   useEffect(() => {
     let alive = true;
     const run = async () => {
@@ -115,19 +114,18 @@ const CafePage: React.FC = () => {
           uniqueId: `KUL-${raw.id}`,
         }));
 
-        if (!alive) return;
-        setCafes([...mappedNongkrong, ...mappedKuliner]);
-      } catch (e: any) {
-        if (alive) setError("Gagal mengambil data dari database.");
+        if (!alive) setCafes([...mappedNongkrong, ...mappedKuliner]);
+      } catch (e) {
+        console.error(e);
       } finally {
         if (alive) setLoading(false);
       }
     };
-
     run();
     return () => { alive = false; };
   }, []);
 
+  // FILTER LOGIC
   const filteredCafes = useMemo(() => {
     return cafes.filter((cafe) => {
       const matchSearch = cafe.name.toLowerCase().includes(search.toLowerCase());
@@ -152,84 +150,93 @@ const CafePage: React.FC = () => {
     setActiveFilters(prev => prev.includes(f) ? prev.filter(x => x !== f) : [...prev, f]);
   };
 
-  // Reset limit ke 10 setiap kali user melakukan pencarian atau filter baru
   useEffect(() => {
-    setVisibleLimit(10);
+    setVisibleLimit(9);
   }, [search, activeKategori, activeFilters]);
 
   return (
-    <div className="flex justify-center px-4 py-10 md:py-16 bg-slate-50 min-h-screen">
-      <div className="w-full max-w-6xl">
-        <h1 className="font-playfair text-3xl md:text-4xl font-bold text-[#001845]">Cafe & Culinary</h1>
-        <p className="mt-2 text-slate-600">Discover the best spots in Purwokerto</p>
+    <div className="flex justify-center px-4 py-8 md:py-16 bg-slate-50 min-h-screen">
+      <div className="w-full max-w-7xl">
+        
+        {/* Header Responsive */}
+        <div className="text-center md:text-left mb-8">
+            <h1 className="font-playfair text-3xl md:text-4xl lg:text-5xl font-bold text-[#001845]">Cafe & Culinary</h1>
+            <p className="mt-2 text-sm md:text-base text-slate-600">Temukan tempat nongkrong & makan enak di Purwokerto</p>
+        </div>
 
-        {/* SEARCH */}
-        <div className="mt-6 w-full rounded-full border border-slate-200 bg-white px-6 py-3 flex items-center gap-3 shadow-sm">
-          <span>🔍</span>
+        {/* Search Bar */}
+        <div className="w-full rounded-full border border-slate-200 bg-white px-5 py-3 md:px-6 md:py-4 flex items-center gap-3 shadow-sm hover:shadow-md transition">
+          <span className="text-slate-400">🔍</span>
           <input 
-            className="flex-1 outline-none text-slate-700" 
-            placeholder="Cari nama tempat..." 
+            className="flex-1 outline-none text-slate-700 text-sm md:text-base" 
+            placeholder="Cari nama cafe atau kuliner..." 
             value={search} 
             onChange={(e) => setSearch(e.target.value)} 
           />
         </div>
 
-        {/* KATEGORI */}
-        <div className="mt-4 flex flex-wrap gap-2">
-          {["Tempat Nongkrong", "Kuliner"].map(cat => (
-            <button
-              key={cat}
-              onClick={() => setActiveKategori(activeKategori === cat ? null : cat)}
-              className={`px-4 py-2 rounded-full border text-sm transition ${activeKategori === cat ? "bg-[#001845] text-white" : "bg-white text-slate-600"}`}
-            >
-              {cat}
-            </button>
-          ))}
+        {/* Filter Container */}
+        <div className="mt-6 flex flex-col gap-4">
+            {/* Kategori Toggle */}
+            <div className="flex flex-wrap gap-2 justify-center md:justify-start">
+                {["Tempat Nongkrong", "Kuliner"].map(cat => (
+                    <button
+                    key={cat}
+                    onClick={() => setActiveKategori(activeKategori === cat ? null : cat)}
+                    className={`px-4 py-2 md:px-5 md:py-2.5 rounded-full border text-xs md:text-sm font-medium transition active:scale-95 ${activeKategori === cat ? "bg-[#001845] text-white shadow-lg" : "bg-white text-slate-600 hover:bg-slate-100"}`}
+                    >
+                    {cat}
+                    </button>
+                ))}
+            </div>
+
+            {/* Filter Fasilitas (Horizontal Scroll di HP agar rapi) */}
+            <div className="flex gap-2 overflow-x-auto pb-2 md:pb-0 md:flex-wrap no-scrollbar">
+                {allFacilityFilters.map(f => (
+                    <button
+                    key={f}
+                    onClick={() => toggleFilter(f)}
+                    className={`whitespace-nowrap flex items-center gap-2 px-3 py-2 md:px-4 md:py-2 rounded-full border text-[11px] md:text-xs transition active:scale-95 ${activeFilters.includes(f) ? "bg-[#001845] text-white shadow" : "bg-white text-slate-600 hover:bg-slate-50"}`}
+                    >
+                    {facilityIcon[f]} {f}
+                    </button>
+                ))}
+            </div>
         </div>
 
-        {/* FASILITAS */}
-        <div className="mt-3 flex flex-wrap gap-2">
-          {allFacilityFilters.map(f => (
-            <button
-              key={f}
-              onClick={() => toggleFilter(f)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-full border text-xs transition ${activeFilters.includes(f) ? "bg-[#001845] text-white" : "bg-white text-slate-600"}`}
-            >
-              {facilityIcon[f]} {f}
-            </button>
-          ))}
-        </div>
+        {loading && <p className="mt-20 text-center text-slate-400 animate-pulse">Memuat data...</p>}
 
-        {loading && <p className="mt-10 text-center text-slate-400 animate-pulse">Memuat data...</p>}
-
-        {/* LIST GRID */}
+        {/* Content Grid */}
         {!loading && (
-          <div className="mt-10">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-              {/* SLICE DATA DISINI: Hanya tampilkan sesuai limit */}
+          <div className="mt-8 md:mt-10">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
               {filteredCafes.slice(0, visibleLimit).map((cafe) => (
-                <Link key={cafe.uniqueId} to={`/cafes/${cafe.uniqueId}`} className="group">
-                  <article className="bg-white rounded-[32px] shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden flex flex-col h-full border border-slate-100">
-                    <div className="h-60 overflow-hidden">
+                <Link key={cafe.uniqueId} to={`/cafes/${cafe.uniqueId}`} className="group h-full">
+                  <article className="bg-white rounded-[24px] md:rounded-[32px] shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 overflow-hidden flex flex-col h-full border border-slate-100">
+                    <div className="h-52 md:h-60 overflow-hidden relative">
                       <img 
                           src={cafe.imageUrl || "https://placehold.co/800x600?text=Cafe"} 
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" 
                           alt={cafe.name} 
+                          loading="lazy"
                       />
+                      <div className="absolute top-3 left-3 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider text-amber-600 shadow-sm">
+                          {cafe.kategori}
+                      </div>
                     </div>
-                    <div className="p-6 flex flex-col flex-1">
-                      <span className="text-[10px] font-bold uppercase tracking-widest text-amber-600 mb-2">{cafe.kategori}</span>
-                      <h2 className="font-playfair text-xl font-bold text-[#001845]">{cafe.name}</h2>
-                      <p className="mt-2 text-sm text-slate-500 line-clamp-2">{cafe.description}</p>
+                    
+                    <div className="p-5 md:p-6 flex flex-col flex-1">
+                      <h2 className="font-playfair text-lg md:text-xl font-bold text-[#001845] leading-tight mb-2">{cafe.name}</h2>
+                      <p className="text-xs md:text-sm text-slate-500 line-clamp-2 mb-4">{cafe.description}</p>
                       
-                      <div className="mt-4 pt-4 border-t border-slate-100 text-xs text-slate-400 space-y-1">
-                        <p>📍 {cafe.address}</p>
-                        <p>🕒 {cafe.detailInfo}</p>
+                      <div className="mt-auto pt-4 border-t border-slate-50 text-[11px] md:text-xs text-slate-400 space-y-1.5">
+                        <p className="flex items-center gap-1.5">📍 <span className="truncate">{cafe.address}</span></p>
+                        <p className="flex items-center gap-1.5">🕒 {cafe.detailInfo}</p>
                       </div>
 
-                      <div className="mt-6 flex gap-2 flex-wrap">
-                        {cafe.facilities.map(f => facilityIcon[f] && (
-                          <div key={f} className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 border border-slate-100" title={facilityLabel[f] || f}>
+                      <div className="mt-4 flex gap-1.5 flex-wrap">
+                        {cafe.facilities.slice(0, 5).map(f => facilityIcon[f] && (
+                          <div key={f} className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 border border-slate-100 text-xs" title={facilityLabel[f] || f}>
                             {facilityIcon[f]}
                           </div>
                         ))}
@@ -240,19 +247,19 @@ const CafePage: React.FC = () => {
               ))}
             </div>
 
-            {/* --- KONTROL LIMIT DISPLAY --- */}
+            {/* Pagination Controls */}
             {filteredCafes.length > 0 && (
               <div className="mt-12 flex flex-col items-center gap-4 border-t border-slate-200 pt-8">
-                 <p className="text-sm text-slate-500">
+                 <p className="text-xs md:text-sm text-slate-500">
                     Menampilkan <span className="font-bold text-[#001845]">{Math.min(visibleLimit, filteredCafes.length)}</span> dari {filteredCafes.length} tempat
                  </p>
                  
-                 <div className="flex flex-wrap justify-center gap-3">
-                    {[10, 20, 50].map((limit) => (
+                 <div className="flex flex-wrap justify-center gap-2 md:gap-3">
+                    {[9, 18, 36].map((limit) => (
                        <button
                          key={limit}
                          onClick={() => setVisibleLimit(limit)}
-                         className={`px-5 py-2 rounded-full text-sm font-medium transition ${
+                         className={`px-4 py-1.5 md:px-5 md:py-2 rounded-full text-xs md:text-sm font-medium transition active:scale-95 ${
                             visibleLimit === limit 
                             ? "bg-[#001845] text-white shadow-md" 
                             : "bg-white border border-slate-300 text-slate-600 hover:bg-slate-50"
@@ -262,10 +269,9 @@ const CafePage: React.FC = () => {
                        </button>
                     ))}
                     
-                    {/* Tombol Tampilkan Semua */}
                     <button
                        onClick={() => setVisibleLimit(filteredCafes.length)}
-                       className={`px-5 py-2 rounded-full text-sm font-medium transition ${
+                       className={`px-4 py-1.5 md:px-5 md:py-2 rounded-full text-xs md:text-sm font-medium transition active:scale-95 ${
                           visibleLimit >= filteredCafes.length
                           ? "bg-[#001845] text-white shadow-md" 
                           : "bg-white border border-slate-300 text-slate-600 hover:bg-slate-50"
@@ -276,9 +282,12 @@ const CafePage: React.FC = () => {
                  </div>
               </div>
             )}
-
+            
             {filteredCafes.length === 0 && (
-                <p className="text-center text-slate-500 mt-10">Data tidak ditemukan.</p>
+                <div className="text-center py-20">
+                    <p className="text-slate-400 mb-2">Tidak ada tempat yang cocok.</p>
+                    <button onClick={() => {setSearch(""); setActiveKategori(null); setActiveFilters([])}} className="text-[#001845] font-semibold text-sm underline">Reset Filter</button>
+                </div>
             )}
           </div>
         )}
