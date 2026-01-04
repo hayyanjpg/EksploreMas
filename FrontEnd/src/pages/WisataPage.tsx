@@ -64,7 +64,7 @@ const WisataPage: React.FC = () => {
   const [activeKategori, setActiveKategori] = useState<string | null>(null);
   
   // STATE BARU: Limit item
-  const [visibleLimit, setVisibleLimit] = useState<number>(10);
+  const [visibleLimit, setVisibleLimit] = useState<number>(9);
 
   const [wisatas, setWisatas] = useState<WisataUI[]>([]);
   const [loading, setLoading] = useState(true);
@@ -148,7 +148,7 @@ const WisataPage: React.FC = () => {
 
   // Reset limit saat filter berubah
   useEffect(() => {
-    setVisibleLimit(10);
+    setVisibleLimit(9);
   }, [search, activeKategori, activeFilters]);
 
   return (
@@ -244,7 +244,7 @@ const WisataPage: React.FC = () => {
                  </p>
                  
                  <div className="flex flex-wrap justify-center gap-3">
-                    {[10, 20, 50].map((limit) => (
+                    {[9, 18].map((limit) => (
                        <button
                          key={limit}
                          onClick={() => setVisibleLimit(limit)}
