@@ -1,4 +1,4 @@
-hero.tsx
+
 import brushUrl from "/src/assets/images/hero/brush.png";
 import tuguUrl from "/src/assets/images/hero/tugu.png";
 import cloud1Url from "/src/assets/images/hero/cloud-1.png";
