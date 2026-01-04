@@ -10,7 +10,9 @@ import ItineraryDayList from "../components/trip/ItineraryDayList";
 // TYPES
 import { TripCategory, ItineraryDay, ItineraryActivity } from "../types/trip";
 
-// Tipe Lokal untuk Data Mentah
+// React Icons
+import { FiInfo, FiAlertCircle } from "react-icons/fi";
+
 type TripPlace = {
   uniqueId: string;
   id: string;
@@ -20,17 +22,11 @@ type TripPlace = {
   imageUrl: string;
   description: string;
   priceRange?: string;
-  
-  // UPDATE: Menyimpan harga tiket asli dari DB
   rawPrice: number; 
 };
 
 const TIME_SLOTS = ["08:00", "10:00", "12:30", "14:30", "16:30", "19:00"];
 const DURATION_LABELS = ["1.5 jam", "2 jam", "1 jam", "1.5 jam", "2 jam", "2 jam"];
-
-// Konstanta Estimasi Tambahan (Makan/Minum/Parkir/Bensin per lokasi)
-// Karena HTM database biasanya hanya tiket masuk.
-const ESTIMATED_EXTRA_COST = 25000; 
 
 // --------------------------------
 // 🔧 Helper: Shuffle Array
@@ -65,7 +61,6 @@ function buildItinerary(places: TripPlace[], days: number): ItineraryDay[] {
     if (mainCategory === "pendidikan") subtitle = "Edukasi & Sejarah";
     if (mainCategory === "alam") subtitle = "Menikmati Alam";
 
-    // Membentuk Activity Object
     const activity: ItineraryActivity = {
       time: "", 
       title: place.name,
@@ -76,15 +71,12 @@ function buildItinerary(places: TripPlace[], days: number): ItineraryDay[] {
       durationLabel: "", 
       imageUrl: place.imageUrl,
       uniqueId: place.uniqueId,
-      
-      // UPDATE: Masukkan harga asli ke itinerary
       price: place.rawPrice 
     };
 
     result[dayIndex].activities.push(activity);
   });
 
-  // Assign Waktu & Durasi
   result.forEach((day) => {
     day.activities.forEach((act, idx) => {
       const slotIndex = idx % TIME_SLOTS.length;
@@ -97,18 +89,16 @@ function buildItinerary(places: TripPlace[], days: number): ItineraryDay[] {
 }
 
 // --------------------------------
-// 💰 Hitung Budget Real
+// 💰 Hitung Budget (HANYA TIKET)
 // --------------------------------
 function getEstimatedBudget(itinerary: ItineraryDay[]): number {
   let total = 0;
-
   itinerary.forEach((day) => {
     day.activities.forEach((act) => {
-      // Rumus: Harga Tiket Database + Estimasi Jajan/Parkir
-      total += (act.price + ESTIMATED_EXTRA_COST);
+      // Murni harga dari database, tanpa tambahan asumsi
+      total += act.price;
     });
   });
-
   return total;
 }
 
@@ -123,11 +113,14 @@ const TripPlanner: React.FC = () => {
   const [selectedDays, setSelectedDays] = useState<number>(1);
   const [itinerary, setItinerary] = useState<ItineraryDay[]>([]);
   
+  // State untuk menampilkan detail info budget
+  const [showBudgetInfo, setShowBudgetInfo] = useState(false);
+  
   const [allPlaces, setAllPlaces] = useState<TripPlace[]>([]);
   const [loading, setLoading] = useState(true);
 
   // ===============================
-  // 1. FETCH DATA DARI API
+  // 1. FETCH DATA
   // ===============================
   useEffect(() => {
     const fetchAllData = async () => {
@@ -145,8 +138,6 @@ const TripPlanner: React.FC = () => {
         const dataNongkrong = await resNongkrong.json();
         const dataKuliner = await resKuliner.json();
 
-        // --- MAPPING DATA & HARGA ---
-
         const placesAlam: TripPlace[] = dataAlam.map((item: any) => ({
           uniqueId: `ALAM-${item.id}`,
           id: String(item.id),
@@ -156,7 +147,7 @@ const TripPlanner: React.FC = () => {
           imageUrl: item.link_foto,
           description: item.deskripsi,
           priceRange: item.htm === 0 ? "Gratis" : `Rp ${item.htm?.toLocaleString('id-ID')}`,
-          rawPrice: Number(item.htm) || 0 // Harga tiket asli
+          rawPrice: Number(item.htm) || 0
         }));
 
         const placesEdu: TripPlace[] = dataEdu.map((item: any) => ({
@@ -179,7 +170,7 @@ const TripPlanner: React.FC = () => {
           address: item.alamat,
           imageUrl: item.link_foto,
           description: item.deskripsi,
-          priceRange: item.htm === 0 ? "Menu mulai Rp 15rb" : `Rp ${item.htm?.toLocaleString('id-ID')}`,
+          priceRange: item.htm === 0 ? "Menu bervariasi" : `Rp ${item.htm?.toLocaleString('id-ID')}`,
           rawPrice: Number(item.htm) || 0
         }));
 
@@ -191,7 +182,7 @@ const TripPlanner: React.FC = () => {
           address: item.alamat,
           imageUrl: item.link_foto,
           description: item.deskripsi,
-          priceRange: item.htm === 0 ? "Menu mulai Rp 10rb" : `Rp ${item.htm?.toLocaleString('id-ID')}`,
+          priceRange: item.htm === 0 ? "Menu bervariasi" : `Rp ${item.htm?.toLocaleString('id-ID')}`,
           rawPrice: Number(item.htm) || 0
         }));
 
@@ -207,7 +198,7 @@ const TripPlanner: React.FC = () => {
   }, [API_BASE]);
 
   // ===============================
-  // 2. FILTER LOGIC
+  // 2. FILTER & LOGIC
   // ===============================
   const filteredPlaces = useMemo(() => {
     if (selectedCategories.length === 0) return allPlaces;
@@ -216,7 +207,6 @@ const TripPlanner: React.FC = () => {
     );
   }, [allPlaces, selectedCategories]);
 
-  // HANDLERS
   const handleToggleCategory = (cat: TripCategory) => {
     setSelectedCategories((prev) =>
       prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat]
@@ -232,6 +222,7 @@ const TripPlanner: React.FC = () => {
     const generated = buildItinerary(filteredPlaces, selectedDays);
     setItinerary(generated);
     setStep(3);
+    setShowBudgetInfo(true); // Tampilkan info budget saat pertama kali generate
   };
 
   const totalActivities = itinerary.reduce(
@@ -239,7 +230,6 @@ const TripPlanner: React.FC = () => {
     0
   );
   
-  // Hitung budget real dari itinerary yang sudah digenerate
   const estimatedBudget = getEstimatedBudget(itinerary);
 
   // ===============================
@@ -294,17 +284,43 @@ const TripPlanner: React.FC = () => {
 
             {step === 3 && (
               <div className="space-y-8 animate-fadeIn">
-                <ItinerarySummary
-                  selectedDays={selectedDays}
-                  totalActivities={totalActivities}
-                  estimatedBudget={estimatedBudget}
-                  onBackToDuration={() => setStep(2)}
-                  onBackToCategory={() => setStep(1)}
-                />
+                <div onClick={() => setShowBudgetInfo(!showBudgetInfo)} className="cursor-pointer">
+                    <ItinerarySummary
+                    selectedDays={selectedDays}
+                    totalActivities={totalActivities}
+                    estimatedBudget={estimatedBudget}
+                    onBackToDuration={() => setStep(2)}
+                    onBackToCategory={() => setStep(1)}
+                    />
+                </div>
+
+                {/* DISCLAIMER BOX (Tampil jika showBudgetInfo true) */}
+                {showBudgetInfo && (
+                  <div className="mx-auto max-w-2xl bg-amber-50 border border-amber-200 rounded-2xl p-4 flex gap-4 items-start animate-fadeIn">
+                    <div className="p-2 bg-amber-100 text-amber-600 rounded-full mt-1">
+                      <FiAlertCircle size={20} />
+                    </div>
+                    <div className="text-sm text-slate-700 space-y-1">
+                      <p className="font-bold text-amber-800">Tentang Estimasi Biaya:</p>
+                      <p>
+                        Nominal di atas <strong>HANYA estimasi harga tiket masuk (HTM)</strong> berdasarkan data di sistem kami.
+                      </p>
+                      <p className="text-slate-500 text-xs italic">
+                        *Mohon siapkan budget tambahan untuk biaya parkir, makan, bensin, dan kebutuhan pribadi lainnya. Harga tiket dapat berubah sewaktu-waktu.
+                      </p>
+                    </div>
+                  </div>
+                )}
+                
                 <ItineraryDayList itinerary={itinerary} />
                 
-                <div className="text-center text-xs text-slate-400 mt-8">
-                  * Estimasi budget mencakup: Tiket Masuk Database + Estimasi Makan/Parkir (Rp 25.000/lokasi).
+                <div className="text-center mt-8">
+                   <button 
+                     onClick={() => setShowBudgetInfo(!showBudgetInfo)}
+                     className="text-xs text-slate-400 hover:text-[#001845] flex items-center justify-center gap-1 mx-auto transition-colors"
+                   >
+                     <FiInfo/> Klik pada ringkasan biaya untuk melihat detail estimasi.
+                   </button>
                 </div>
               </div>
             )}
