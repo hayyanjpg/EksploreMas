@@ -1,16 +1,16 @@
 // src/pages/TripPlanner.tsx
 import React, { useMemo, useState, useEffect } from "react";
 
-// COMPONENTS
+// COMPONENTS (Pastikan path import ini benar sesuai struktur folder Anda)
 import CategorySelector from "../components/trip/CategorySelector";
 import DurationSelector from "../components/trip/DurationSelector";
 import ItinerarySummary from "../components/trip/ItinerarySummary";
 import ItineraryDayList from "../components/trip/ItineraryDayList";
 
-// IMPORT TYPES DARI SUMBER UTAMA (JANGAN DEFINISI ULANG LOKAL)
+// IMPORT TYPES DARI FILE YANG BARU KITA BUAT DI ATAS
 import { TripCategory, ItineraryDay, ItineraryActivity } from "../types/trip";
 
-// Tipe Lokal hanya untuk TripPlace (data mentah sebelum jadi itinerary)
+// Tipe Lokal hanya untuk data mentah dari API (sebelum jadi Itinerary)
 type TripPlace = {
   uniqueId: string;
   id: string;
@@ -26,7 +26,7 @@ const TIME_SLOTS = ["08:00", "10:00", "12:30", "14:30", "16:30", "19:00"];
 const DURATION_LABELS = ["1.5 jam", "2 jam", "1 jam", "1.5 jam", "2 jam", "2 jam"];
 
 // --------------------------------
-// 🔧 Helper: Shuffle Array
+// 🔧 Helper: Shuffle Array (Acak urutan)
 // --------------------------------
 function shuffleArray<T>(array: T[]): T[] {
   return array
@@ -51,7 +51,7 @@ function buildItinerary(places: TripPlace[], days: number): ItineraryDay[] {
   limitedPlaces.forEach((place, index) => {
     const dayIndex = index % days;
     
-    // Pastikan kategori memiliki fallback yang valid sesuai tipe TripCategory
+    // Pastikan kategori memiliki fallback
     const mainCategory: TripCategory = place.categories[0] ?? "alam";
 
     let subtitle = "Eksplorasi Seru";
@@ -60,19 +60,18 @@ function buildItinerary(places: TripPlace[], days: number): ItineraryDay[] {
     if (mainCategory === "pendidikan") subtitle = "Edukasi & Sejarah";
     if (mainCategory === "alam") subtitle = "Menikmati Alam";
 
-    // Membentuk objek activity sesuai tipe ItineraryActivity dari types/trip
+    // Membentuk objek activity
+    // KARENA types/trip.ts SUDAH DIUPDATE, KITA BISA MASUKKAN imageUrl & uniqueId
     const activity: ItineraryActivity = {
-      time: "", // Nanti diisi
+      time: "", 
       title: place.name,
       subtitle: subtitle,
       address: place.address,
-      category: mainCategory, // Sekarang tipe datanya sudah cocok (TripCategory)
+      category: mainCategory,
       priceLabel: place.priceRange ?? "Fleksibel",
-      durationLabel: "", // Nanti diisi
-      imageUrl: place.imageUrl,
-      // Jika ItineraryActivity di types/trip butuh uniqueId, tambahkan.
-      // Jika error 'Object literal may only specify known properties', hapus uniqueId ini.
-      // uniqueId: place.uniqueId, 
+      durationLabel: "", 
+      imageUrl: place.imageUrl, // Tidak akan error lagi
+      uniqueId: place.uniqueId, // Tidak akan error lagi
     };
 
     result[dayIndex].activities.push(activity);
@@ -132,7 +131,7 @@ const TripPlanner: React.FC = () => {
         const dataNongkrong = await resNongkrong.json();
         const dataKuliner = await resKuliner.json();
 
-        // Mapping Data Alam
+        // Mapping Data dengan UniqueID
         const placesAlam: TripPlace[] = dataAlam.map((item: any) => ({
           uniqueId: `ALAM-${item.id}`,
           id: String(item.id),
@@ -144,7 +143,6 @@ const TripPlanner: React.FC = () => {
           priceRange: `Rp ${item.htm?.toLocaleString('id-ID')}`
         }));
 
-        // Mapping Data Pendidikan
         const placesEdu: TripPlace[] = dataEdu.map((item: any) => ({
           uniqueId: `EDU-${item.id}`,
           id: String(item.id),
@@ -156,7 +154,6 @@ const TripPlanner: React.FC = () => {
           priceRange: `Rp ${item.htm?.toLocaleString('id-ID')}`
         }));
 
-        // Mapping Data Cafe
         const placesCafe: TripPlace[] = dataNongkrong.map((item: any) => ({
           uniqueId: `CAFE-${item.id}`,
           id: String(item.id),
@@ -168,7 +165,6 @@ const TripPlanner: React.FC = () => {
           priceRange: `Rp ${item.htm?.toLocaleString('id-ID')}`
         }));
 
-        // Mapping Data Kuliner
         const placesKuliner: TripPlace[] = dataKuliner.map((item: any) => ({
           uniqueId: `KUL-${item.id}`,
           id: String(item.id),
@@ -192,7 +188,7 @@ const TripPlanner: React.FC = () => {
   }, [API_BASE]);
 
   // ===============================
-  // 2. FILTER BERDASARKAN KATEGORI
+  // 2. FILTER LOGIC
   // ===============================
   const filteredPlaces = useMemo(() => {
     if (selectedCategories.length === 0) return allPlaces;
@@ -201,9 +197,7 @@ const TripPlanner: React.FC = () => {
     );
   }, [allPlaces, selectedCategories]);
 
-  // ===============================
   // HANDLERS
-  // ===============================
   const handleToggleCategory = (cat: TripCategory) => {
     setSelectedCategories((prev) =>
       prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat]
@@ -228,7 +222,7 @@ const TripPlanner: React.FC = () => {
   const estimatedBudget = getEstimatedBudget(itinerary);
 
   // ===============================
-  // RENDER
+  // RENDER UI
   // ===============================
   if (loading) {
     return (
@@ -242,39 +236,24 @@ const TripPlanner: React.FC = () => {
     <section className="bg-pageRadial min-h-screen">
       <div className="flex justify-center px-4 py-10 md:py-16">
         <div className="w-full max-w-6xl">
-          {/* HEADER */}
           <header className="text-center mb-10">
-            <p className="text-sm md:text-base text-slate-500 flex items-center justify-center gap-2">
-              <span>✨</span>
-              <span>ExploreMas Trip Planner</span>
-              <span>✨</span>
-            </p>
             <h1 className="mt-2 font-playfair text-3xl md:text-4xl font-bold text-[#001845]">
               Trip Planner AI
             </h1>
             <p className="mt-3 text-slate-600 text-sm md:text-base">
-              Pilih kategori favoritmu & durasi liburan —{" "}
-              <br className="hidden md:block" />
-              kami buatkan rencana perjalanan otomatis dari database terlengkap!
+              Rencanakan liburanmu di Purwokerto secara otomatis!
             </p>
           </header>
 
           {/* STEP INDICATOR */}
           <div className="flex items-center justify-center gap-2 text-xs md:text-sm mb-8 text-slate-500">
-            <span className={`px-4 py-1.5 rounded-full transition-all ${step === 1 ? "bg-[#001845] text-white shadow-lg" : "bg-white/50"}`}>
-              1. Kategori
-            </span>
+            <span className={`px-4 py-1.5 rounded-full transition-all ${step === 1 ? "bg-[#001845] text-white" : "bg-white/50"}`}>1. Kategori</span>
             <span>›</span>
-            <span className={`px-4 py-1.5 rounded-full transition-all ${step === 2 ? "bg-[#001845] text-white shadow-lg" : "bg-white/50"}`}>
-              2. Durasi
-            </span>
+            <span className={`px-4 py-1.5 rounded-full transition-all ${step === 2 ? "bg-[#001845] text-white" : "bg-white/50"}`}>2. Durasi</span>
             <span>›</span>
-            <span className={`px-4 py-1.5 rounded-full transition-all ${step === 3 ? "bg-[#001845] text-white shadow-lg" : "bg-white/50"}`}>
-              3. Hasil Itinerary
-            </span>
+            <span className={`px-4 py-1.5 rounded-full transition-all ${step === 3 ? "bg-[#001845] text-white" : "bg-white/50"}`}>3. Itinerary</span>
           </div>
 
-          {/* CONTENT */}
           <div className="transition-all duration-500">
             {step === 1 && (
               <CategorySelector
@@ -305,7 +284,7 @@ const TripPlanner: React.FC = () => {
                 <ItineraryDayList itinerary={itinerary} />
                 
                 <div className="text-center text-xs text-slate-400 mt-8">
-                  * Estimasi budget belum termasuk transportasi antar lokasi & penginapan.
+                  * Estimasi budget belum termasuk transportasi & penginapan.
                 </div>
               </div>
             )}
