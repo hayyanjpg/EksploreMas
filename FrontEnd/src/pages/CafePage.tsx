@@ -69,7 +69,7 @@ const CafePage: React.FC = () => {
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
   const [activeKategori, setActiveKategori] = useState<string | null>(null);
 
-  // SET LIMIT AWAL JADI 9
+  // Limit Display: 9, 18, 36
   const [visibleLimit, setVisibleLimit] = useState<number>(9);
 
   const [cafes, setCafes] = useState<CafeUI[]>([]);
@@ -89,7 +89,7 @@ const CafePage: React.FC = () => {
         const dataNongkrong = await resNongkrong.json();
         const dataKuliner = await resKuliner.json();
 
-        const mapToUI = (raw: any, idx: number, prefix: string): Omit<CafeUI, "uniqueId"> => {
+        const mapToUI = (raw: any, prefix: string): Omit<CafeUI, "uniqueId"> => {
           const kategori = pickString(raw, ["kategori"], prefix === "CAFE" ? "tempat nongkrong" : "kuliner");
           return {
             id: String(raw.id),
@@ -104,19 +104,23 @@ const CafePage: React.FC = () => {
           };
         };
 
-        const mappedNongkrong = dataNongkrong.map((raw: any, idx: number) => ({
-          ...mapToUI(raw, idx, "CAFE"),
+        const mappedNongkrong = dataNongkrong.map((raw: any) => ({
+          ...mapToUI(raw, "CAFE"),
           uniqueId: `CAFE-${raw.id}`,
         }));
 
-        const mappedKuliner = dataKuliner.map((raw: any, idx: number) => ({
-          ...mapToUI(raw, idx, "KUL"),
+        const mappedKuliner = dataKuliner.map((raw: any) => ({
+          ...mapToUI(raw, "KUL"),
           uniqueId: `KUL-${raw.id}`,
         }));
 
-        if (!alive) setCafes([...mappedNongkrong, ...mappedKuliner]);
+        // PERBAIKAN DI SINI: Gunakan 'if (alive)' bukan 'if (!alive)'
+        if (alive) {
+            setCafes([...mappedNongkrong, ...mappedKuliner]);
+        }
+
       } catch (e) {
-        console.error(e);
+        console.error("Gagal mengambil data:", e);
       } finally {
         if (alive) setLoading(false);
       }
@@ -215,7 +219,7 @@ const CafePage: React.FC = () => {
                   <article className="bg-white rounded-[24px] md:rounded-[32px] shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 overflow-hidden flex flex-col h-full border border-slate-100">
                     <div className="h-52 md:h-60 overflow-hidden relative">
                       <img 
-                          src={cafe.imageUrl || "https://placehold.co/800x600?text=Cafe"} 
+                          src={cafe.imageUrl && cafe.imageUrl !== "-" ? cafe.imageUrl : "https://placehold.co/800x600?text=Cafe"} 
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" 
                           alt={cafe.name} 
                           loading="lazy"
@@ -232,6 +236,7 @@ const CafePage: React.FC = () => {
                       <div className="mt-auto pt-4 border-t border-slate-50 text-[11px] md:text-xs text-slate-400 space-y-1.5">
                         <p className="flex items-center gap-1.5">📍 <span className="truncate">{cafe.address}</span></p>
                         <p className="flex items-center gap-1.5">🕒 {cafe.detailInfo}</p>
+                        <p className="flex items-center gap-1.5">💸 {cafe.priceRange}</p>
                       </div>
 
                       <div className="mt-4 flex gap-1.5 flex-wrap">
