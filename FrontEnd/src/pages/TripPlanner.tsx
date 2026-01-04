@@ -1,16 +1,16 @@
 // src/pages/TripPlanner.tsx
 import React, { useMemo, useState, useEffect } from "react";
 
-// COMPONENTS (Pastikan path import ini benar sesuai struktur folder Anda)
+// COMPONENTS
 import CategorySelector from "../components/trip/CategorySelector";
 import DurationSelector from "../components/trip/DurationSelector";
 import ItinerarySummary from "../components/trip/ItinerarySummary";
 import ItineraryDayList from "../components/trip/ItineraryDayList";
 
-// IMPORT TYPES DARI FILE YANG BARU KITA BUAT DI ATAS
+// TYPES
 import { TripCategory, ItineraryDay, ItineraryActivity } from "../types/trip";
 
-// Tipe Lokal hanya untuk data mentah dari API (sebelum jadi Itinerary)
+// Tipe Lokal untuk Data Mentah
 type TripPlace = {
   uniqueId: string;
   id: string;
@@ -20,13 +20,20 @@ type TripPlace = {
   imageUrl: string;
   description: string;
   priceRange?: string;
+  
+  // UPDATE: Menyimpan harga tiket asli dari DB
+  rawPrice: number; 
 };
 
 const TIME_SLOTS = ["08:00", "10:00", "12:30", "14:30", "16:30", "19:00"];
 const DURATION_LABELS = ["1.5 jam", "2 jam", "1 jam", "1.5 jam", "2 jam", "2 jam"];
 
+// Konstanta Estimasi Tambahan (Makan/Minum/Parkir/Bensin per lokasi)
+// Karena HTM database biasanya hanya tiket masuk.
+const ESTIMATED_EXTRA_COST = 25000; 
+
 // --------------------------------
-// 🔧 Helper: Shuffle Array (Acak urutan)
+// 🔧 Helper: Shuffle Array
 // --------------------------------
 function shuffleArray<T>(array: T[]): T[] {
   return array
@@ -50,8 +57,6 @@ function buildItinerary(places: TripPlace[], days: number): ItineraryDay[] {
 
   limitedPlaces.forEach((place, index) => {
     const dayIndex = index % days;
-    
-    // Pastikan kategori memiliki fallback
     const mainCategory: TripCategory = place.categories[0] ?? "alam";
 
     let subtitle = "Eksplorasi Seru";
@@ -60,8 +65,7 @@ function buildItinerary(places: TripPlace[], days: number): ItineraryDay[] {
     if (mainCategory === "pendidikan") subtitle = "Edukasi & Sejarah";
     if (mainCategory === "alam") subtitle = "Menikmati Alam";
 
-    // Membentuk objek activity
-    // KARENA types/trip.ts SUDAH DIUPDATE, KITA BISA MASUKKAN imageUrl & uniqueId
+    // Membentuk Activity Object
     const activity: ItineraryActivity = {
       time: "", 
       title: place.name,
@@ -70,8 +74,11 @@ function buildItinerary(places: TripPlace[], days: number): ItineraryDay[] {
       category: mainCategory,
       priceLabel: place.priceRange ?? "Fleksibel",
       durationLabel: "", 
-      imageUrl: place.imageUrl, // Tidak akan error lagi
-      uniqueId: place.uniqueId, // Tidak akan error lagi
+      imageUrl: place.imageUrl,
+      uniqueId: place.uniqueId,
+      
+      // UPDATE: Masukkan harga asli ke itinerary
+      price: place.rawPrice 
     };
 
     result[dayIndex].activities.push(activity);
@@ -89,13 +96,20 @@ function buildItinerary(places: TripPlace[], days: number): ItineraryDay[] {
   return result;
 }
 
+// --------------------------------
+// 💰 Hitung Budget Real
+// --------------------------------
 function getEstimatedBudget(itinerary: ItineraryDay[]): number {
-  const perActivityAvg = 35000;
-  const totalActivities = itinerary.reduce(
-    (acc, day) => acc + day.activities.length,
-    0
-  );
-  return totalActivities * perActivityAvg;
+  let total = 0;
+
+  itinerary.forEach((day) => {
+    day.activities.forEach((act) => {
+      // Rumus: Harga Tiket Database + Estimasi Jajan/Parkir
+      total += (act.price + ESTIMATED_EXTRA_COST);
+    });
+  });
+
+  return total;
 }
 
 // =====================================
@@ -131,7 +145,8 @@ const TripPlanner: React.FC = () => {
         const dataNongkrong = await resNongkrong.json();
         const dataKuliner = await resKuliner.json();
 
-        // Mapping Data dengan UniqueID
+        // --- MAPPING DATA & HARGA ---
+
         const placesAlam: TripPlace[] = dataAlam.map((item: any) => ({
           uniqueId: `ALAM-${item.id}`,
           id: String(item.id),
@@ -140,7 +155,8 @@ const TripPlanner: React.FC = () => {
           address: item.alamat,
           imageUrl: item.link_foto,
           description: item.deskripsi,
-          priceRange: `Rp ${item.htm?.toLocaleString('id-ID')}`
+          priceRange: item.htm === 0 ? "Gratis" : `Rp ${item.htm?.toLocaleString('id-ID')}`,
+          rawPrice: Number(item.htm) || 0 // Harga tiket asli
         }));
 
         const placesEdu: TripPlace[] = dataEdu.map((item: any) => ({
@@ -151,7 +167,8 @@ const TripPlanner: React.FC = () => {
           address: item.alamat,
           imageUrl: item.link_foto,
           description: item.deskripsi,
-          priceRange: `Rp ${item.htm?.toLocaleString('id-ID')}`
+          priceRange: item.htm === 0 ? "Gratis" : `Rp ${item.htm?.toLocaleString('id-ID')}`,
+          rawPrice: Number(item.htm) || 0
         }));
 
         const placesCafe: TripPlace[] = dataNongkrong.map((item: any) => ({
@@ -162,7 +179,8 @@ const TripPlanner: React.FC = () => {
           address: item.alamat,
           imageUrl: item.link_foto,
           description: item.deskripsi,
-          priceRange: `Rp ${item.htm?.toLocaleString('id-ID')}`
+          priceRange: item.htm === 0 ? "Menu mulai Rp 15rb" : `Rp ${item.htm?.toLocaleString('id-ID')}`,
+          rawPrice: Number(item.htm) || 0
         }));
 
         const placesKuliner: TripPlace[] = dataKuliner.map((item: any) => ({
@@ -173,7 +191,8 @@ const TripPlanner: React.FC = () => {
           address: item.alamat,
           imageUrl: item.link_foto,
           description: item.deskripsi,
-          priceRange: `Rp ${item.htm?.toLocaleString('id-ID')}`
+          priceRange: item.htm === 0 ? "Menu mulai Rp 10rb" : `Rp ${item.htm?.toLocaleString('id-ID')}`,
+          rawPrice: Number(item.htm) || 0
         }));
 
         setAllPlaces([...placesAlam, ...placesEdu, ...placesCafe, ...placesKuliner]);
@@ -219,6 +238,8 @@ const TripPlanner: React.FC = () => {
     (acc, day) => acc + day.activities.length,
     0
   );
+  
+  // Hitung budget real dari itinerary yang sudah digenerate
   const estimatedBudget = getEstimatedBudget(itinerary);
 
   // ===============================
@@ -245,7 +266,6 @@ const TripPlanner: React.FC = () => {
             </p>
           </header>
 
-          {/* STEP INDICATOR */}
           <div className="flex items-center justify-center gap-2 text-xs md:text-sm mb-8 text-slate-500">
             <span className={`px-4 py-1.5 rounded-full transition-all ${step === 1 ? "bg-[#001845] text-white" : "bg-white/50"}`}>1. Kategori</span>
             <span>›</span>
@@ -284,7 +304,7 @@ const TripPlanner: React.FC = () => {
                 <ItineraryDayList itinerary={itinerary} />
                 
                 <div className="text-center text-xs text-slate-400 mt-8">
-                  * Estimasi budget belum termasuk transportasi & penginapan.
+                  * Estimasi budget mencakup: Tiket Masuk Database + Estimasi Makan/Parkir (Rp 25.000/lokasi).
                 </div>
               </div>
             )}
