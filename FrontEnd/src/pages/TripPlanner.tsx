@@ -1,34 +1,16 @@
 // src/pages/TripPlanner.tsx
 import React, { useMemo, useState, useEffect } from "react";
-import { Link } from "react-router-dom";
 
 // COMPONENTS
-// Pastikan komponen-komponen ini ada di folder components/trip Anda
 import CategorySelector from "../components/trip/CategorySelector";
 import DurationSelector from "../components/trip/DurationSelector";
 import ItinerarySummary from "../components/trip/ItinerarySummary";
 import ItineraryDayList from "../components/trip/ItineraryDayList";
 
-// TYPES (Bisa didefinisikan di sini atau di types/trip.ts)
-export type TripCategory = "alam" | "pendidikan" | "cafe" | "kuliner";
+// IMPORT TYPES DARI SUMBER UTAMA (JANGAN DEFINISI ULANG LOKAL)
+import { TripCategory, ItineraryDay, ItineraryActivity } from "../types/trip";
 
-export interface ItineraryActivity {
-  time: string;
-  title: string;
-  subtitle: string;
-  address: string;
-  category: string;
-  priceLabel: string;
-  durationLabel: string;
-  imageUrl: string;
-  uniqueId: string; // Untuk link detail
-}
-
-export interface ItineraryDay {
-  day: number;
-  activities: ItineraryActivity[];
-}
-
+// Tipe Lokal hanya untuk TripPlace (data mentah sebelum jadi itinerary)
 type TripPlace = {
   uniqueId: string;
   id: string;
@@ -44,7 +26,7 @@ const TIME_SLOTS = ["08:00", "10:00", "12:30", "14:30", "16:30", "19:00"];
 const DURATION_LABELS = ["1.5 jam", "2 jam", "1 jam", "1.5 jam", "2 jam", "2 jam"];
 
 // --------------------------------
-// 🔧 Helper: Shuffle Array (Agar itinerary bervariasi)
+// 🔧 Helper: Shuffle Array
 // --------------------------------
 function shuffleArray<T>(array: T[]): T[] {
   return array
@@ -57,14 +39,8 @@ function shuffleArray<T>(array: T[]): T[] {
 // 🔧 Generate Itinerary Logic
 // --------------------------------
 function buildItinerary(places: TripPlace[], days: number): ItineraryDay[] {
-  // 1. Acak urutan tempat agar hasil generate selalu fresh
   const shuffledPlaces = shuffleArray(places);
-
-  // 2. Hitung slot maksimal
   const maxActivities = days * TIME_SLOTS.length;
-  
-  // 3. Ambil tempat sejumlah slot yang tersedia
-  // (Jika tempat kurang, ambil semua yang ada)
   const limitedPlaces = shuffledPlaces.slice(0, maxActivities);
 
   const result: ItineraryDay[] = Array.from({ length: days }, (_, i) => ({
@@ -73,9 +49,10 @@ function buildItinerary(places: TripPlace[], days: number): ItineraryDay[] {
   }));
 
   limitedPlaces.forEach((place, index) => {
-    // Distribusi tempat ke hari secara round-robin (Day 1, Day 2, Day 1, dst)
     const dayIndex = index % days;
-    const mainCategory = place.categories[0] ?? "alam";
+    
+    // Pastikan kategori memiliki fallback yang valid sesuai tipe TripCategory
+    const mainCategory: TripCategory = place.categories[0] ?? "alam";
 
     let subtitle = "Eksplorasi Seru";
     if (mainCategory === "cafe") subtitle = "Nongkrong Santai";
@@ -83,22 +60,26 @@ function buildItinerary(places: TripPlace[], days: number): ItineraryDay[] {
     if (mainCategory === "pendidikan") subtitle = "Edukasi & Sejarah";
     if (mainCategory === "alam") subtitle = "Menikmati Alam";
 
-    result[dayIndex].activities.push({
+    // Membentuk objek activity sesuai tipe ItineraryActivity dari types/trip
+    const activity: ItineraryActivity = {
       time: "", // Nanti diisi
       title: place.name,
       subtitle: subtitle,
       address: place.address,
-      category: mainCategory,
+      category: mainCategory, // Sekarang tipe datanya sudah cocok (TripCategory)
       priceLabel: place.priceRange ?? "Fleksibel",
       durationLabel: "", // Nanti diisi
       imageUrl: place.imageUrl,
-      uniqueId: place.uniqueId
-    });
+      // Jika ItineraryActivity di types/trip butuh uniqueId, tambahkan.
+      // Jika error 'Object literal may only specify known properties', hapus uniqueId ini.
+      // uniqueId: place.uniqueId, 
+    };
+
+    result[dayIndex].activities.push(activity);
   });
 
-  // 4. Assign Waktu & Durasi berdasarkan slot
+  // Assign Waktu & Durasi
   result.forEach((day) => {
-    // Urutkan aktivitas di dalam hari itu (opsional, tapi di sini kita pakai urutan slot)
     day.activities.forEach((act, idx) => {
       const slotIndex = idx % TIME_SLOTS.length;
       act.time = TIME_SLOTS[slotIndex];
@@ -110,7 +91,6 @@ function buildItinerary(places: TripPlace[], days: number): ItineraryDay[] {
 }
 
 function getEstimatedBudget(itinerary: ItineraryDay[]): number {
-  // Asumsi rata-rata pengeluaran per tempat (Tiket/Makan) = 35.000
   const perActivityAvg = 35000;
   const totalActivities = itinerary.reduce(
     (acc, day) => acc + day.activities.length,
@@ -130,7 +110,6 @@ const TripPlanner: React.FC = () => {
   const [selectedDays, setSelectedDays] = useState<number>(1);
   const [itinerary, setItinerary] = useState<ItineraryDay[]>([]);
   
-  // State Data dari API
   const [allPlaces, setAllPlaces] = useState<TripPlace[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -177,7 +156,7 @@ const TripPlanner: React.FC = () => {
           priceRange: `Rp ${item.htm?.toLocaleString('id-ID')}`
         }));
 
-        // Mapping Data Cafe (Nongkrong)
+        // Mapping Data Cafe
         const placesCafe: TripPlace[] = dataNongkrong.map((item: any) => ({
           uniqueId: `CAFE-${item.id}`,
           id: String(item.id),
@@ -201,7 +180,6 @@ const TripPlanner: React.FC = () => {
           priceRange: `Rp ${item.htm?.toLocaleString('id-ID')}`
         }));
 
-        // Gabungkan semua
         setAllPlaces([...placesAlam, ...placesEdu, ...placesCafe, ...placesKuliner]);
       } catch (error) {
         console.error("Gagal mengambil data trip:", error);
@@ -218,8 +196,6 @@ const TripPlanner: React.FC = () => {
   // ===============================
   const filteredPlaces = useMemo(() => {
     if (selectedCategories.length === 0) return allPlaces;
-
-    // Filter: Tempat harus memiliki SALAH SATU kategori yang dipilih
     return allPlaces.filter((place) =>
       place.categories.some((cat) => selectedCategories.includes(cat))
     );
@@ -240,7 +216,6 @@ const TripPlanner: React.FC = () => {
   };
 
   const handleGenerate = () => {
-    // Generate Itinerary menggunakan data yang sudah difilter
     const generated = buildItinerary(filteredPlaces, selectedDays);
     setItinerary(generated);
     setStep(3);
@@ -299,7 +274,7 @@ const TripPlanner: React.FC = () => {
             </span>
           </div>
 
-          {/* CONTENT PER STEP */}
+          {/* CONTENT */}
           <div className="transition-all duration-500">
             {step === 1 && (
               <CategorySelector
@@ -329,10 +304,8 @@ const TripPlanner: React.FC = () => {
                 />
                 <ItineraryDayList itinerary={itinerary} />
                 
-                {/* Note tambahan */}
                 <div className="text-center text-xs text-slate-400 mt-8">
                   * Estimasi budget belum termasuk transportasi antar lokasi & penginapan.
-                  <br /> Klik kartu destinasi untuk melihat detail lengkap.
                 </div>
               </div>
             )}
