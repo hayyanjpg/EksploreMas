@@ -71,8 +71,8 @@ If you want to replicate the performance test results:
 
 2.  **Clone this repository**:
     ```bash
-    git clone [https://github.com/yourusername/QA-Portfolio-ExploreMas.git](https://github.com/yourusername/QA-Portfolio-ExploreMas.git)
-    cd QA-Portfolio-ExploreMas
+    git clone [https://github.com/hayyanjpg/EksploreMas.git]
+    cd EkploreMas
     ```
 
 3.  **Run the script**:
